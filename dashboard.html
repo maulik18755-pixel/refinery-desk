@@ -499,6 +499,7 @@ let refreshLog = [];
 let fxLive = null;
 let eiaLive = false;
 let liveNews = null;
+let mcxData = null;
 
 // EIA API key — get a free key at https://www.eia.gov/opendata/
 // Leave empty to use reference data only (no EIA calls will be made)
@@ -704,10 +705,22 @@ function renderCrude() {
     ['Murban','crude.murban'],['Basrah Light','crude.basrahLight'],['Arab Light','crude.arabLight'],
     ['Upper Zakum','crude.upperZakum'],['ESPO','crude.espo'],
   ];
+  const usdInr = get('fx.usdInr').current || 83.72;
+  const mcxRow = (() => {
+    if (mcxData && mcxData.price) {
+      const inr = mcxData.price;
+      const usd = (inr / usdInr).toFixed(2);
+      const chg = mcxData.previousClose ? (inr - mcxData.previousClose) : null;
+      const chgStr = chg !== null ? `<span class="${chg>=0?'up':'down'}">${chg>=0?'+':''}${chg.toFixed(0)}</span>` : '<span class="flat">—</span>';
+      return `<tr><td class="label-cell">MCX Crude <span class="sub" style="display:block">Near-Month Futures</span></td><td><span style="font-family:var(--mono)">₹${Number(inr).toLocaleString('en-IN',{maximumFractionDigits:0})}/bbl</span><br><span class="sub">≈ $${usd}</span></td><td>${chgStr}</td><td class="sub">India (MCX)</td><td class="sub" style="font-size:9px;color:var(--green)">● LIVE</td></tr>`;
+    }
+    return `<tr title="MCX feed pending"><td class="label-cell">MCX Crude <span class="sub" style="display:block">Near-Month Futures</span></td><td class="flat" title="MCX feed pending">--</td><td class="flat">--</td><td class="sub">India (MCX)</td><td class="flat" style="font-size:9px" title="MCX feed pending">server.py</td></tr>`;
+  })();
+
   document.getElementById('crudeBenchmarks').innerHTML = `<thead><tr><th>Grade</th><th>Price ($/bbl)</th><th>Change</th><th>Region</th><th>Trend (24 ticks)</th></tr></thead><tbody>${grades.map(([name,key]) => {
     const s = get(key);
     return `<tr><td class="label-cell">${name}</td><td>${fmt(s.current)}</td><td class="${cls(s.change)}">${fmtSgn(s.change)} (${fmtSgn(s.pctChange)}%)</td><td class="sub">${s.region}</td><td>${sparkHTML(s.history)}</td></tr>`;
-  }).join('')}</tbody>`;
+  }).join('')}${mcxRow}</tbody>`;
 
   // Differentials
   const diffs = [
@@ -1093,6 +1106,7 @@ function renderArchitecture() {
     { name:'EIA Crude Spot Prices (Brent & WTI)', url:'api.eia.gov', type: eiaLive ? 'live' : 'planned', refresh: eiaLive ? 'Every 300s' : 'Requires EIA_API_KEY', covers:'Brent (RBRTE), WTI (RWTC) — daily spot prices', note: eiaLive ? 'Live daily spot prices from EIA Open Data API v2. Brent and WTI updated every 5 minutes.' : 'Set EIA_API_KEY constant in dashboard.html to enable. Free key at eia.gov/opendata. Dubai/other benchmarks remain simulated.' },
     { name:'Crude Oil Benchmarks (other grades)', url:'—', type:'simulated', refresh:'Every 5s (sim tick)', covers:'Dubai, Oman, Murban, Basrah Light, Arab Light, Upper Zakum, ESPO', note:'Reference prices seeded from recent Platts/Argus actuals. Simulated tick updates for UX. Production: connect to Platts eWindow, Argus, or ICE API.' },
     { name:'News RSS Feed', url:'/api/news (Flask proxy)', type: liveNews ? 'live' : 'planned', refresh: liveNews ? 'Every 5 min' : 'Requires Flask server', covers:'Oil, refinery, crude, OPEC headlines from Google News RSS', note: liveNews ? 'Live RSS feed via server.py proxy. Run: python3 server.py' : 'Start server.py (Flask) to enable live news. Falls back to curated reference headlines automatically.' },
+    { name:'MCX Crude Oil Futures', url:'/api/mcx (Flask proxy → Yahoo Finance)', type: mcxData && mcxData.price ? 'live' : 'planned', refresh: mcxData && mcxData.price ? 'Every 5 min' : 'Requires Flask server', covers:'CRUDEOIL.MCX near-month futures — price in ₹/bbl with USD equivalent at live FX', note: mcxData && mcxData.price ? `Live. Last: ₹${Number(mcxData.price).toLocaleString('en-IN',{maximumFractionDigits:0})}/bbl via Yahoo Finance. Visible in Crude Oil tab benchmarks table.` : 'Start server.py to enable. Price displayed in Crude Oil tab with ₹/bbl and USD equivalent. Shows "--" with tooltip when unavailable.' },
     { name:'Product Prices', url:'—', type:'simulated', refresh:'Every 5s (sim tick)', covers:'Gasoline, Diesel, Jet, Fuel Oil across MOPS/NWE/USGC', note:'Reference prices from recent MOPS/Platts assessments. Production: Platts MOC, Argus, or OPIS feeds.' },
     { name:'Petrochemical Feedstock', url:'—', type:'simulated', refresh:'Every 5s (sim tick)', covers:'Naphtha, Ethylene, Propylene, BTX, Paraxylene', note:'Reference from ICIS/Platts petchem assessments. Production: ICIS, Platts, or Argus petchem data feeds.' },
     { name:'Freight / Tanker Rates', url:'—', type:'simulated', refresh:'Every 5s (sim tick)', covers:'VLCC, Suezmax, Aframax, MR rates on key routes', note:'Reference from Baltic Exchange and Clarksons. Production: Baltic Exchange API, Clarksons SIN.' },
@@ -1274,6 +1288,25 @@ async function fetchNews() {
   }
 }
 
+// ── 2C: MCX CRUDE OIL FUTURES ──
+// Fetches near-month MCX crude price (₹/bbl) via Flask /api/mcx proxy (Yahoo Finance).
+// Falls back silently — row shows "--" with tooltip when server is not running.
+async function fetchMcx() {
+  try {
+    const resp = await fetch('/api/mcx');
+    if (!resp.ok) throw new Error('MCX proxy HTTP ' + resp.status);
+    const data = await resp.json();
+    if (data.price) {
+      mcxData = data;
+      const usdInr = get('fx.usdInr').current || 83.72;
+      addRefreshLog('MCX API (/api/mcx)', 'live',
+        `CRUDEOIL.MCX ₹${Number(data.price).toLocaleString('en-IN',{maximumFractionDigits:0})}/bbl ≈ $${(data.price/usdInr).toFixed(2)}`);
+    }
+  } catch(e) {
+    console.warn('MCX fetch failed (server.py not running?):', e.message);
+  }
+}
+
 function addRefreshLog(source, status, detail) {
   const now = new Date();
   const time = now.toLocaleTimeString('en-GB', {hour:'2-digit',minute:'2-digit',second:'2-digit',timeZone:'Asia/Kolkata'});
@@ -1318,6 +1351,7 @@ updateMarketStatus();
 fetchFxRates();
 fetchEIACrude();
 fetchNews();
+fetchMcx();
 
 // Intervals
 setInterval(mainLoop, 5000);          // Data tick every 5s
@@ -1327,6 +1361,7 @@ setInterval(rotateAlert, 12000);      // Alert rotation every 12s
 setInterval(fetchFxRates, 60000);     // FX API every 60s
 setInterval(fetchEIACrude, 300000);   // EIA crude every 5 min
 setInterval(fetchNews, 300000);       // News RSS every 5 min
+setInterval(fetchMcx, 300000);        // MCX crude every 5 min
 
 // Initial log entries
 addRefreshLog('System', 'live', 'Dashboard initialized');
