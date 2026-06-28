@@ -2,11 +2,13 @@
 RefineryDesk Flask proxy server.
 
 Routes:
-  GET /          — serves dashboard.html
-  GET /api/news  — proxies Google News RSS, returns JSON [{title, link, pubDate, source}]
-  GET /api/fx    — proxies open.er-api.com/v6/latest/USD
-  GET /api/mcx   — proxies MCX Crude Oil near-month futures from Yahoo Finance
-                   returns JSON {price, currency, symbol, source} or {price: null, error}
+  GET /                  — serves index.html
+  GET /api/news          — proxies Google News RSS, returns JSON [{title, link, pubDate, source}]
+  GET /api/fx            — proxies open.er-api.com/v6/latest/USD
+  GET /api/mcx           — MCX Crude Oil near-month futures from Yahoo Finance
+  GET /api/commodities   — Global futures via Yahoo Finance:
+                           BZ=F (Brent), CL=F (WTI), RB=F (RBOB Gasoline),
+                           HO=F (Heating Oil/Diesel), NG=F (Natural Gas)
 
 Run:
   pip install flask feedparser requests
@@ -25,6 +27,15 @@ NEWS_RSS = 'https://news.google.com/rss/search?q=oil+refinery+crude+OPEC&hl=en-U
 FX_URL   = 'https://open.er-api.com/v6/latest/USD'
 MCX_URL  = 'https://query1.finance.yahoo.com/v8/finance/chart/CRUDEOIL.MCX'
 
+# Yahoo Finance commodity futures symbols
+COMMODITY_SYMBOLS = {
+    'brentFutures':  'BZ=F',   # ICE Brent Crude Futures ($/bbl)
+    'wtiFutures':    'CL=F',   # NYMEX WTI Crude Futures ($/bbl)
+    'gasolineRBOB':  'RB=F',   # NYMEX RBOB Gasoline Futures ($/gallon → ×42 for $/bbl)
+    'heatingOil':    'HO=F',   # NYMEX Heating Oil Futures ($/gallon → ×42 for $/bbl)
+    'natGas':        'NG=F',   # NYMEX Natural Gas Futures ($/MMBtu)
+}
+
 # Yahoo Finance requires a browser-like User-Agent
 YF_HEADERS = {
     'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 '
@@ -33,9 +44,22 @@ YF_HEADERS = {
 }
 
 
+def _yf_fetch(symbol):
+    """Fetch a single Yahoo Finance symbol. Returns meta dict or raises."""
+    resp = requests.get(
+        f'https://query1.finance.yahoo.com/v8/finance/chart/{symbol}',
+        headers=YF_HEADERS,
+        params={'interval': '1m', 'range': '1d'},
+        timeout=6,
+    )
+    resp.raise_for_status()
+    data = resp.json()
+    return data['chart']['result'][0]['meta']
+
+
 @app.route('/')
 def index():
-    return send_file('dashboard.html')
+    return send_file('index.html')
 
 
 @app.route('/api/news')
@@ -72,31 +96,44 @@ def mcx():
     """
     Fetches MCX Crude Oil near-month futures price from Yahoo Finance.
     MCX crude is quoted in INR per barrel; 1 lot = 100 barrels.
-    Returns: {price, currency, symbol, marketState, source}
-    On failure: {price: null, error: <message>}
+    Returns: {price, previousClose, currency, symbol, source}
+    On failure: {price: null, error}  (always HTTP 200)
     """
     try:
-        resp = requests.get(
-            MCX_URL,
-            headers=YF_HEADERS,
-            params={'interval': '1m', 'range': '1d'},
-            timeout=6,
-        )
-        resp.raise_for_status()
-        data = resp.json()
-        result = data['chart']['result'][0]
-        meta = result['meta']
+        meta = _yf_fetch('CRUDEOIL.MCX')
         return jsonify({
-            'price':       meta.get('regularMarketPrice'),
+            'price':         meta.get('regularMarketPrice'),
             'previousClose': meta.get('chartPreviousClose'),
-            'currency':    meta.get('currency', 'INR'),
-            'symbol':      meta.get('symbol', 'CRUDEOIL.MCX'),
-            'marketState': meta.get('currentTradingPeriod', {}).get('regular', {}).get('timezone', ''),
-            'source':      'Yahoo Finance (MCX)',
+            'currency':      meta.get('currency', 'INR'),
+            'symbol':        meta.get('symbol', 'CRUDEOIL.MCX'),
+            'source':        'Yahoo Finance (MCX)',
         })
     except Exception as e:
-        # Always return 200 so the dashboard can distinguish "server reachable but data unavailable"
         return jsonify({'price': None, 'error': str(e)}), 200
+
+
+@app.route('/api/commodities')
+def commodities():
+    """
+    Fetches global commodity futures from Yahoo Finance.
+    Returns one object per symbol — price, previousClose, currency, symbol.
+    Prices are in native units ($/bbl for crude, $/gallon for petroleum products,
+    $/MMBtu for natural gas). The client converts $/gallon → $/bbl by × 42.
+    Always HTTP 200; failed symbols carry {price: null, error}.
+    """
+    results = {}
+    for name, symbol in COMMODITY_SYMBOLS.items():
+        try:
+            meta = _yf_fetch(symbol)
+            results[name] = {
+                'price':         meta.get('regularMarketPrice'),
+                'previousClose': meta.get('chartPreviousClose'),
+                'currency':      meta.get('currency', 'USD'),
+                'symbol':        symbol,
+            }
+        except Exception as e:
+            results[name] = {'price': None, 'error': str(e)}
+    return jsonify(results)
 
 
 if __name__ == '__main__':

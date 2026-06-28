@@ -62,9 +62,13 @@ export const REF = {
   },
 };
 
-// EIA API key — get a free key at https://www.eia.gov/opendata/
-// Leave empty to use reference data only (no EIA calls will be made)
+// EIA API key — free at https://www.eia.gov/opendata/  (takes ~1 min to register)
+// Enables live Brent & WTI daily spot prices
 export const EIA_API_KEY = '';
+
+// FRED API key — free at https://fred.stlouisfed.org/docs/api/api_key.html  (~1 min)
+// Enables live US Fed Funds rate, 10Y Treasury yield, DXY dollar index
+export const FRED_API_KEY = '';
 
 // Curated reference headlines — used as fallback when live news is unavailable
 // SIMULATED: these are static reference examples, not live feed data
@@ -92,6 +96,8 @@ export const APP = {
   refreshLog: [],
   fxLive: null,
   eiaLive: false,
+  commoditiesLive: false,
+  fredLive: false,
   liveNews: null,
   mcxData: null,
   grmHistory: [],

@@ -1,4 +1,4 @@
-import { APP, get, addRefreshLog, EIA_API_KEY } from './data.js';
+import { APP, get, addRefreshLog, EIA_API_KEY, FRED_API_KEY } from './data.js';
 
 // ──────────────────────────────────────────────
 // SECTION 8: LIVE DATA FETCH FUNCTIONS
@@ -103,6 +103,91 @@ export async function fetchNews() {
   } catch(e) {
     console.warn('News fetch failed (server.py not running?):', e.message);
     addRefreshLog('News RSS', 'simulated', 'Using curated headlines — start server.py to enable live feed');
+  }
+}
+
+// ── COMMODITIES: Global futures via /api/commodities (Yahoo Finance via server.py) ──
+// BZ=F Brent, CL=F WTI, RB=F RBOB Gasoline, HO=F Heating Oil, NG=F Natural Gas
+// $/gallon products are converted to $/bbl (×42) client-side
+export async function fetchCommodities() {
+  try {
+    const resp = await fetch('/api/commodities');
+    if (!resp.ok) throw new Error('Commodities proxy HTTP ' + resp.status);
+    const data = await resp.json();
+    const updates = [];
+
+    // Brent futures → crude.brent (if EIA not live)
+    if (data.brentFutures?.price && !APP.eiaLive && APP.STATE['crude.brent']) {
+      APP.STATE['crude.brent'].current = +data.brentFutures.price.toFixed(2);
+      APP.STATE['crude.brent'].base    = APP.STATE['crude.brent'].current;
+      updates.push(`Brent $${data.brentFutures.price.toFixed(2)}`);
+    }
+    // WTI futures → crude.wti (if EIA not live)
+    if (data.wtiFutures?.price && !APP.eiaLive && APP.STATE['crude.wti']) {
+      APP.STATE['crude.wti'].current = +data.wtiFutures.price.toFixed(2);
+      APP.STATE['crude.wti'].base    = APP.STATE['crude.wti'].current;
+      updates.push(`WTI $${data.wtiFutures.price.toFixed(2)}`);
+    }
+    // RBOB Gasoline $/gallon → $/bbl (×42) → products.gasolineUSGC
+    if (data.gasolineRBOB?.price && APP.STATE['products.gasolineUSGC']) {
+      const bbl = +(data.gasolineRBOB.price * 42).toFixed(2);
+      APP.STATE['products.gasolineUSGC'].current = bbl;
+      APP.STATE['products.gasolineUSGC'].base    = bbl;
+      updates.push(`RBOB $${bbl}/bbl`);
+    }
+    // Heating Oil $/gallon → $/bbl (×42) → products.dieselUSGC
+    if (data.heatingOil?.price && APP.STATE['products.dieselUSGC']) {
+      const bbl = +(data.heatingOil.price * 42).toFixed(2);
+      APP.STATE['products.dieselUSGC'].current = bbl;
+      APP.STATE['products.dieselUSGC'].base    = bbl;
+      updates.push(`HO $${bbl}/bbl`);
+    }
+    // Store raw commodities data for display
+    APP.commoditiesData = data;
+
+    if (updates.length > 0) {
+      APP.commoditiesLive = true;
+      addRefreshLog('Yahoo Finance (/api/commodities)', 'live', updates.join(' · '));
+    }
+  } catch(e) {
+    console.warn('Commodities fetch failed (server.py not running?):', e.message);
+    addRefreshLog('Commodities (Yahoo Finance)', 'simulated', 'Fetch failed — start server.py to enable');
+  }
+}
+
+// ── FRED API: US macro rates (Fed Funds, 10Y Treasury) ──
+// Free key at https://fred.stlouisfed.org/docs/api/api_key.html
+// Series used: FEDFUNDS (Fed Funds rate), GS10 (10Y Treasury), DTWEXBGS (Dollar Index)
+export async function fetchFred() {
+  if (!FRED_API_KEY) return;
+  const series = [
+    { id: 'FEDFUNDS', label: 'Fed Funds Rate' },
+    { id: 'GS10',     label: '10Y Treasury' },
+  ];
+  const results = [];
+  try {
+    for (const s of series) {
+      const url = `https://api.stlouisfed.org/fred/series/observations` +
+        `?series_id=${s.id}&api_key=${FRED_API_KEY}&file_type=json` +
+        `&sort_order=desc&limit=1`;
+      const resp = await fetch(url);
+      if (!resp.ok) continue;
+      const json = await resp.json();
+      const val = json?.observations?.[0]?.value;
+      if (val && val !== '.') {
+        results.push(`${s.label}: ${parseFloat(val).toFixed(2)}%`);
+        // Store for use in renderFx rate table
+        if (!APP.fredData) APP.fredData = {};
+        APP.fredData[s.id] = parseFloat(val);
+      }
+    }
+    if (results.length > 0) {
+      APP.fredLive = true;
+      addRefreshLog('FRED API (St. Louis Fed)', 'live', results.join(' · '));
+    }
+  } catch(e) {
+    console.warn('FRED fetch failed:', e.message);
+    addRefreshLog('FRED API', 'simulated', 'Fetch failed — check FRED_API_KEY. ' + e.message);
   }
 }
 

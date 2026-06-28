@@ -1,4 +1,4 @@
-import { APP, get, fmt, fmtSgn, cls, sparkHTML, priceCell, CURATED_NEWS } from './data.js';
+import { APP, get, fmt, fmtSgn, cls, sparkHTML, priceCell, CURATED_NEWS, FRED_API_KEY } from './data.js';
 
 // ──────────────────────────────────────────────
 // SECTION 7: RENDER FUNCTIONS
@@ -416,15 +416,16 @@ export function renderFx() {
     `<tr><td class="label-cell">${name}</td><td style="font-family:var(--mono)">${val}</td><td class="sub">${src}</td><td class="sub">${sig}</td></tr>`
   ).join('')}</tbody>`;
 
+  const fred = APP.fredData || {};
   const rateData = [
-    ['RBI Repo Rate', '6.50%', 'Unchanged since Feb 2024'],
-    ['US Fed Funds', '5.25-5.50%', 'Hold; cuts expected H2 2025'],
-    ['ECB Main Refi', '4.25%', 'Cut cycle started Jun 2024'],
-    ['10Y India G-Sec', '7.05%', 'Stable'],
-    ['10Y US Treasury', '4.28%', 'Elevated'],
+    ['RBI Repo Rate', '6.50%', 'Reference'],
+    ['US Fed Funds', fred.FEDFUNDS ? fred.FEDFUNDS.toFixed(2) + '%' : '5.25–5.50%', fred.FEDFUNDS ? '● LIVE (FRED)' : 'Reference — add FRED_API_KEY'],
+    ['ECB Main Refi', '4.25%', 'Reference'],
+    ['10Y India G-Sec', '7.05%', 'Reference'],
+    ['10Y US Treasury', fred.GS10 ? fred.GS10.toFixed(2) + '%' : '4.28%', fred.GS10 ? '● LIVE (FRED)' : 'Reference — add FRED_API_KEY'],
   ];
   document.getElementById('tblRates').innerHTML = `<thead><tr><th>Rate</th><th>Level</th><th>Context</th></tr></thead><tbody>${rateData.map(([name,val,ctx]) =>
-    `<tr><td class="label-cell">${name}</td><td style="font-family:var(--mono)">${val}</td><td class="sub">${ctx}</td></tr>`
+    `<tr><td class="label-cell">${name}</td><td style="font-family:var(--mono)">${val}</td><td class="sub" style="${ctx.includes('LIVE') ? 'color:var(--green)' : ''}">${ctx}</td></tr>`
   ).join('')}</tbody>`;
 }
 
@@ -538,17 +539,17 @@ export function renderNews() {
 // ── 7i: ARCHITECTURE & DATA ──
 export function renderArchitecture() {
   const sources = [
-    { name:'Exchange Rate API', url:'open.er-api.com', type:'live', refresh:'Every 60s', covers:'USD/INR, EUR/USD, GBP/USD, CNY/USD, JPY/USD', note:'Free tier, CORS-enabled. Live API call on page load and every 60 seconds.' },
-    { name:'EIA Crude Spot Prices (Brent & WTI)', url:'api.eia.gov', type: APP.eiaLive ? 'live' : 'planned', refresh: APP.eiaLive ? 'Every 300s' : 'Requires EIA_API_KEY', covers:'Brent (RBRTE), WTI (RWTC) — daily spot prices', note: APP.eiaLive ? 'Live daily spot prices from EIA Open Data API v2. Brent and WTI updated every 5 minutes.' : 'Set EIA_API_KEY constant in js/data.js to enable. Free key at eia.gov/opendata. Dubai/other benchmarks remain simulated.' },
-    { name:'Crude Oil Benchmarks (other grades)', url:'—', type:'simulated', refresh:'Every 5s (sim tick)', covers:'Dubai, Oman, Murban, Basrah Light, Arab Light, Upper Zakum, ESPO', note:'Reference prices seeded from recent Platts/Argus actuals. Simulated tick updates for UX. Production: connect to Platts eWindow, Argus, or ICE API.' },
-    { name:'News RSS Feed', url:'/api/news (Flask proxy)', type: APP.liveNews ? 'live' : 'planned', refresh: APP.liveNews ? 'Every 5 min' : 'Requires Flask server', covers:'Oil, refinery, crude, OPEC headlines from Google News RSS', note: APP.liveNews ? 'Live RSS feed via server.py proxy. Run: python3 server.py' : 'Start server.py (Flask) to enable live news. Falls back to curated reference headlines automatically.' },
-    { name:'MCX Crude Oil Futures', url:'/api/mcx (Flask proxy → Yahoo Finance)', type: APP.mcxData && APP.mcxData.price ? 'live' : 'planned', refresh: APP.mcxData && APP.mcxData.price ? 'Every 5 min' : 'Requires Flask server', covers:'CRUDEOIL.MCX near-month futures — price in ₹/bbl with USD equivalent at live FX', note: APP.mcxData && APP.mcxData.price ? `Live. Last: ₹${Number(APP.mcxData.price).toLocaleString('en-IN',{maximumFractionDigits:0})}/bbl via Yahoo Finance. Visible in Crude Oil tab benchmarks table.` : 'Start server.py to enable. Price displayed in Crude Oil tab with ₹/bbl and USD equivalent. Shows "--" with tooltip when unavailable.' },
-    { name:'Product Prices', url:'—', type:'simulated', refresh:'Every 5s (sim tick)', covers:'Gasoline, Diesel, Jet, Fuel Oil across MOPS/NWE/USGC', note:'Reference prices from recent MOPS/Platts assessments. Production: Platts MOC, Argus, or OPIS feeds.' },
-    { name:'Petrochemical Feedstock', url:'—', type:'simulated', refresh:'Every 5s (sim tick)', covers:'Naphtha, Ethylene, Propylene, BTX, Paraxylene', note:'Reference from ICIS/Platts petchem assessments. Production: ICIS, Platts, or Argus petchem data feeds.' },
-    { name:'Freight / Tanker Rates', url:'—', type:'simulated', refresh:'Every 5s (sim tick)', covers:'VLCC, Suezmax, Aframax, MR rates on key routes', note:'Reference from Baltic Exchange and Clarksons. Production: Baltic Exchange API, Clarksons SIN.' },
-    { name:'OPEC+ Data', url:'—', type:'simulated', refresh:'Manual (static)', covers:'Production quotas, compliance, meeting schedule', note:'Reference data from OPEC Monthly Oil Market Report. Production: OPEC API, Kpler, Vortexa.' },
-    { name:'Macro Indicators', url:'—', type:'simulated', refresh:'Manual (static)', covers:'GDP, PMI, CPI, policy rates', note:'Reference from RBI, ISM, NBS. Production: Bloomberg, Reuters Eikon, CEIC.' },
-    { name:'Port / Canal Status', url:'—', type:'simulated', refresh:'Manual (static)', covers:'Suez, Hormuz, Malacca, Indian ports', note:'Reference indicators. Production: MarineTraffic API, Kpler port data, vessel AIS tracking.' },
+    { name:'Exchange Rate API', url:'open.er-api.com', type:'live', refresh:'Every 60s', covers:'USD/INR, EUR/USD, GBP/USD, CNY/USD, JPY/USD', note:'Free tier, CORS-enabled. No key required. Live on both local and GitHub Pages.' },
+    { name:'EIA Crude Spot Prices (Brent & WTI)', url:'api.eia.gov', type: APP.eiaLive ? 'live' : 'planned', refresh: APP.eiaLive ? 'Every 5 min' : 'Requires EIA_API_KEY', covers:'Brent (RBRTE), WTI (RWTC) — official daily spot prices', note: APP.eiaLive ? 'Live. EIA Open Data API v2 — official US government energy data.' : 'Free key at eia.gov/opendata (1 min signup). Paste into EIA_API_KEY in js/data.js. Works on GitHub Pages.' },
+    { name:'Yahoo Finance Futures (Brent, WTI, RBOB, HO, NG)', url:'/api/commodities (Flask proxy)', type: APP.commoditiesLive ? 'live' : 'planned', refresh: APP.commoditiesLive ? 'Every 60s' : 'Requires Flask server', covers:'BZ=F Brent · CL=F WTI · RB=F RBOB Gasoline · HO=F Heating Oil · NG=F Natural Gas', note: APP.commoditiesLive ? 'Live futures prices via server.py → Yahoo Finance. RBOB & HO converted $/gallon → $/bbl (×42).' : 'Run: python3 server.py — free, no key required. Updates USGC product prices and crude futures live.' },
+    { name:'FRED API (St. Louis Fed)', url:'api.stlouisfed.org', type: APP.fredLive ? 'live' : 'planned', refresh: APP.fredLive ? 'Every hour' : 'Requires FRED_API_KEY', covers:'US Fed Funds Rate (FEDFUNDS) · 10Y Treasury Yield (GS10)', note: APP.fredLive ? 'Live. FRED data is released daily; refreshed hourly.' : 'Free key at fred.stlouisfed.org (1 min signup). Paste into FRED_API_KEY in js/data.js. Works on GitHub Pages.' },
+    { name:'MCX Crude Oil Futures', url:'/api/mcx (Flask proxy → Yahoo Finance)', type: APP.mcxData && APP.mcxData.price ? 'live' : 'planned', refresh: APP.mcxData && APP.mcxData.price ? 'Every 5 min' : 'Requires Flask server', covers:'CRUDEOIL.MCX near-month futures — ₹/bbl with USD equivalent at live FX', note: APP.mcxData && APP.mcxData.price ? `Live. Last: ₹${Number(APP.mcxData.price).toLocaleString('en-IN',{maximumFractionDigits:0})}/bbl via Yahoo Finance.` : 'Run server.py — no key required. Price shown in Crude Oil tab.' },
+    { name:'News RSS Feed', url:'/api/news (Flask proxy)', type: APP.liveNews ? 'live' : 'planned', refresh: APP.liveNews ? 'Every 5 min' : 'Requires Flask server', covers:'Oil, refinery, crude, OPEC headlines from Google News RSS', note: APP.liveNews ? 'Live RSS feed via server.py proxy.' : 'Run server.py — no key required. Falls back to curated headlines automatically.' },
+    { name:'Crude Oil Benchmarks (Dubai, Oman, Murban, Arab Light…)', url:'—', type:'simulated', refresh:'Every 5s (sim tick)', covers:'Dubai, Oman, Murban, Basrah Light, Arab Light, Upper Zakum, ESPO', note:'Reference prices seeded from recent Platts/Argus actuals. Production: Platts eWindow, Argus, or ICE API.' },
+    { name:'Product Prices (MOPS, NWE)', url:'—', type:'simulated', refresh:'Every 5s (sim tick)', covers:'Gasoline, Diesel, Jet, Fuel Oil across MOPS/NWE regions', note:'Reference from recent MOPS/Platts assessments. USGC prices updated live when server.py running.' },
+    { name:'Petrochemical Feedstock', url:'—', type:'simulated', refresh:'Every 5s (sim tick)', covers:'Naphtha, Ethylene, Propylene, BTX, Paraxylene', note:'Reference from ICIS/Platts petchem assessments. Production: ICIS, Platts, or Argus.' },
+    { name:'Freight / Tanker Rates', url:'—', type:'simulated', refresh:'Every 5s (sim tick)', covers:'VLCC, Suezmax, Aframax, MR rates on key routes', note:'Reference from Baltic Exchange and Clarksons. Production: Baltic Exchange API.' },
+    { name:'OPEC+ Data & Port Status', url:'—', type:'simulated', refresh:'Manual (static)', covers:'Production quotas, compliance, meeting schedule, port wait times', note:'Reference data. Production: OPEC API, Kpler, MarineTraffic API.' },
   ];
   document.getElementById('archSources').innerHTML = sources.map(s =>
     `<div class="arch-source"><div style="display:flex;justify-content:space-between;align-items:center"><div class="arch-name">${s.name}</div><span class="arch-status ${s.type}">${s.type.toUpperCase()}</span></div><div class="arch-detail"><strong>Covers:</strong> ${s.covers}<br><strong>Refresh:</strong> ${s.refresh}<br><strong>Note:</strong> ${s.note}</div></div>`

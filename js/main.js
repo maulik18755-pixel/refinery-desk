@@ -1,5 +1,5 @@
 import { APP, initState, tick, addRefreshLog, get } from './data.js';
-import { fetchFxRates, fetchEIACrude, fetchNews, fetchMcx } from './api.js';
+import { fetchFxRates, fetchEIACrude, fetchNews, fetchMcx, fetchCommodities, fetchFred } from './api.js';
 import {
   renderCommand, renderCrude, renderProducts, renderPetchem,
   renderCracks, updateWhatIf, updateScenario,
@@ -135,6 +135,8 @@ fetchFxRates();
 fetchEIACrude();
 fetchNews();
 fetchMcx();
+fetchCommodities();
+fetchFred();
 
 setInterval(mainLoop, 5000);
 setInterval(updateClocks, 1000);
@@ -142,6 +144,8 @@ setInterval(updateMarketStatus, 30000);
 setInterval(rotateAlert, 12000);
 setInterval(fetchFxRates, 60000);
 setInterval(fetchEIACrude, 300000);
+setInterval(fetchCommodities, 60000);   // commodity futures every 60s
+setInterval(fetchFred, 3600000);        // FRED data is daily — refresh every hour
 setInterval(fetchNews, 300000);
 setInterval(fetchMcx, 300000);
 
