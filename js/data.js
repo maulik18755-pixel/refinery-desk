@@ -68,7 +68,7 @@ export const EIA_API_KEY = '';
 
 // FRED API key — free at https://fred.stlouisfed.org/docs/api/api_key.html  (~1 min)
 // Enables live US Fed Funds rate, 10Y Treasury yield, DXY dollar index
-export const FRED_API_KEY = '';
+export const FRED_API_KEY = '8894355ca737e11c6cb1026ec1964847';
 
 // Curated reference headlines — used as fallback when live news is unavailable
 // SIMULATED: these are static reference examples, not live feed data
