@@ -1,4 +1,4 @@
-import { APP, get, fmt, fmtSgn, cls, sparkHTML, priceCell, CURATED_NEWS, FRED_API_KEY } from './data.js';
+import { APP, get, fmt, fmtSgn, cls, sparkHTML, priceCell, CURATED_NEWS, EIA_API_KEY, FRED_API_KEY } from './data.js';
 
 // ──────────────────────────────────────────────
 // SECTION 7: RENDER FUNCTIONS
@@ -540,9 +540,21 @@ export function renderNews() {
 export function renderArchitecture() {
   const sources = [
     { name:'Exchange Rate API', url:'open.er-api.com', type:'live', refresh:'Every 60s', covers:'USD/INR, EUR/USD, GBP/USD, CNY/USD, JPY/USD', note:'Free tier, CORS-enabled. No key required. Live on both local and GitHub Pages.' },
-    { name:'EIA Crude Spot Prices (Brent & WTI)', url:'api.eia.gov', type: APP.eiaLive ? 'live' : 'planned', refresh: APP.eiaLive ? 'Every 5 min' : 'Requires EIA_API_KEY', covers:'Brent (RBRTE), WTI (RWTC) — official daily spot prices', note: APP.eiaLive ? 'Live. EIA Open Data API v2 — official US government energy data.' : 'Free key at eia.gov/opendata (1 min signup). Paste into EIA_API_KEY in js/data.js. Works on GitHub Pages.' },
-    { name:'Yahoo Finance Futures (Brent, WTI, RBOB, HO, NG)', url:'/api/commodities (Flask proxy)', type: APP.commoditiesLive ? 'live' : 'planned', refresh: APP.commoditiesLive ? 'Every 60s' : 'Requires Flask server', covers:'BZ=F Brent · CL=F WTI · RB=F RBOB Gasoline · HO=F Heating Oil · NG=F Natural Gas', note: APP.commoditiesLive ? 'Live futures prices via server.py → Yahoo Finance. RBOB & HO converted $/gallon → $/bbl (×42).' : 'Run: python3 server.py — free, no key required. Updates USGC product prices and crude futures live.' },
-    { name:'FRED API (St. Louis Fed)', url:'api.stlouisfed.org', type: APP.fredLive ? 'live' : 'planned', refresh: APP.fredLive ? 'Every hour' : 'Requires FRED_API_KEY', covers:'US Fed Funds Rate (FEDFUNDS) · 10Y Treasury Yield (GS10)', note: APP.fredLive ? 'Live. FRED data is released daily; refreshed hourly.' : 'Free key at fred.stlouisfed.org (1 min signup). Paste into FRED_API_KEY in js/data.js. Works on GitHub Pages.' },
+    { name:'EIA Crude Spot Prices (Brent & WTI)', url:'api.eia.gov',
+      type: APP.eiaLive ? 'live' : EIA_API_KEY ? 'simulated' : 'planned',
+      refresh: APP.eiaLive ? 'Every 5 min' : EIA_API_KEY ? 'Key set — fetching…' : 'Requires EIA_API_KEY',
+      covers:'Brent (RBRTE), WTI (RWTC) — official daily spot prices',
+      note: APP.eiaLive ? 'Live. EIA Open Data API v2 — official US government energy data.' : EIA_API_KEY ? 'Key configured. Data returns on next fetch cycle (up to 5 min). If stuck, check browser console.' : 'Free key at eia.gov/opendata (1 min signup). Paste into EIA_API_KEY in js/data.js.' },
+    { name:'Yahoo Finance Futures (Brent, WTI, RBOB, HO, NG)', url:'/api/commodities (Flask proxy)',
+      type: APP.commoditiesLive ? 'live' : 'planned',
+      refresh: APP.commoditiesLive ? 'Every 60s' : 'Requires Flask server (python3 server.py)',
+      covers:'BZ=F Brent · CL=F WTI · RB=F RBOB Gasoline · HO=F Heating Oil · NG=F Natural Gas',
+      note: APP.commoditiesLive ? 'Live futures prices via server.py → Yahoo Finance. RBOB & HO converted $/gallon → $/bbl (×42).' : 'Run: python3 server.py — free, no key required. Updates USGC product prices and crude futures live.' },
+    { name:'FRED API (St. Louis Fed)', url:'api.stlouisfed.org',
+      type: APP.fredLive ? 'live' : FRED_API_KEY ? 'simulated' : 'planned',
+      refresh: APP.fredLive ? 'Every hour' : FRED_API_KEY ? 'Key set — fetching…' : 'Requires FRED_API_KEY',
+      covers:'US Fed Funds Rate (FEDFUNDS) · 10Y Treasury Yield (GS10)',
+      note: APP.fredLive ? 'Live. FRED data is released daily; refreshed hourly.' : FRED_API_KEY ? 'Key configured. Data returns on next fetch cycle. If stuck, check browser console.' : 'Free key at fred.stlouisfed.org (1 min signup). Paste into FRED_API_KEY in js/data.js.' },
     { name:'MCX Crude Oil Futures', url:'/api/mcx (Flask proxy → Yahoo Finance)', type: APP.mcxData && APP.mcxData.price ? 'live' : 'planned', refresh: APP.mcxData && APP.mcxData.price ? 'Every 5 min' : 'Requires Flask server', covers:'CRUDEOIL.MCX near-month futures — ₹/bbl with USD equivalent at live FX', note: APP.mcxData && APP.mcxData.price ? `Live. Last: ₹${Number(APP.mcxData.price).toLocaleString('en-IN',{maximumFractionDigits:0})}/bbl via Yahoo Finance.` : 'Run server.py — no key required. Price shown in Crude Oil tab.' },
     { name:'News RSS Feed', url:'/api/news (Flask proxy)', type: APP.liveNews ? 'live' : 'planned', refresh: APP.liveNews ? 'Every 5 min' : 'Requires Flask server', covers:'Oil, refinery, crude, OPEC headlines from Google News RSS', note: APP.liveNews ? 'Live RSS feed via server.py proxy.' : 'Run server.py — no key required. Falls back to curated headlines automatically.' },
     { name:'Crude Oil Benchmarks (Dubai, Oman, Murban, Arab Light…)', url:'—', type:'simulated', refresh:'Every 5s (sim tick)', covers:'Dubai, Oman, Murban, Basrah Light, Arab Light, Upper Zakum, ESPO', note:'Reference prices seeded from recent Platts/Argus actuals. Production: Platts eWindow, Argus, or ICE API.' },

@@ -60,8 +60,8 @@ export async function fetchEIACrude() {
         `Brent: $${APP.STATE['crude.brent'].current.toFixed(2)} · WTI: $${APP.STATE['crude.wti'].current.toFixed(2)}`);
     }
   } catch(e) {
-    console.warn('EIA fetch failed:', e);
-    addRefreshLog('EIA API', 'simulated', 'Fetch failed — using reference data. ' + e.message);
+    console.warn('EIA fetch failed (check key / CORS):', e.message, e);
+    addRefreshLog('EIA API', 'simulated', 'Fetch failed: ' + e.message);
   }
 }
 
@@ -186,8 +186,8 @@ export async function fetchFred() {
       addRefreshLog('FRED API (St. Louis Fed)', 'live', results.join(' · '));
     }
   } catch(e) {
-    console.warn('FRED fetch failed:', e.message);
-    addRefreshLog('FRED API', 'simulated', 'Fetch failed — check FRED_API_KEY. ' + e.message);
+    console.warn('FRED fetch failed (check key / CORS):', e.message, e);
+    addRefreshLog('FRED API', 'simulated', 'Fetch failed: ' + e.message);
   }
 }
 
