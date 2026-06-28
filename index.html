@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#0a0e14">
+<title>Refinery Trading Desk — Market Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+<link rel="manifest" href="manifest.json">
+</head>
+<body>
+
+<!-- ═══════ HEADER ═══════ -->
+<div class="header">
+  <div class="header-left">
+    <div class="logo">REFINERY<span>DESK</span> <span style="font-weight:300;font-size:10px;color:var(--text-muted);margin-left:4px">v1.0</span></div>
+    <div class="market-status" id="marketStatus"></div>
+  </div>
+  <div class="header-right">
+    <div class="refresh-indicator"><div class="pulse"></div><span>LIVE</span></div>
+    <button class="compact-btn" id="exportPdfBtn" onclick="exportPDF()">EXPORT PDF</button>
+    <button class="compact-btn" id="compactBtn" onclick="toggleCompact()">COMPACT</button>
+    <div class="clock" id="clockIST"><div class="label">IST</div><div id="istTime">--:--:--</div></div>
+    <div class="clock" id="clockSGT"><div class="label">SGT</div><div id="sgtTime">--:--:--</div></div>
+    <div class="clock" id="clockLDN"><div class="label">LDN</div><div id="ldnTime">--:--:--</div></div>
+    <div class="clock" id="clockNYC"><div class="label">NYC</div><div id="nycTime">--:--:--</div></div>
+  </div>
+</div>
+
+<!-- ═══════ ALERT BANNER ═══════ -->
+<div class="alert-banner" id="alertBanner">
+  <span class="tag urgent" id="alertTag">ALERT</span>
+  <div style="overflow:hidden;flex:1"><div class="alert-ticker" id="alertTicker"></div></div>
+</div>
+
+<!-- ═══════ TAB BAR ═══════ -->
+<div class="tab-bar" id="tabBar">
+  <button class="tab-btn active" data-tab="command">⬡ Command Center</button>
+  <button class="tab-btn" data-tab="crude">Crude Oil</button>
+  <button class="tab-btn" data-tab="products">Fuel Products</button>
+  <button class="tab-btn" data-tab="petchem">Petrochemicals</button>
+  <button class="tab-btn" data-tab="cracks">Cracks & Margins</button>
+  <button class="tab-btn" data-tab="fx">FX & Macro</button>
+  <button class="tab-btn" data-tab="logistics">Logistics & Freight</button>
+  <button class="tab-btn" data-tab="news">News & Alerts</button>
+  <button class="tab-btn" data-tab="architecture">Architecture & Data</button>
+  <span class="tab-hint">Press 1–9</span>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- TAB 1: COMMAND CENTER                                  -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="tab-content active" id="tab-command">
+  <div class="tab-timestamp"></div>
+  <div class="kpi-strip" id="kpiStrip"></div>
+  <div class="grid grid-4" id="commandCards"></div>
+  <div class="section-title" style="margin-top:16px">Key Crack Spreads vs Dubai</div>
+  <div class="grid grid-4" id="crackCards"></div>
+  <div class="section-title" style="margin-top:16px">Arbitrage Windows</div>
+  <div class="grid grid-3" id="arbCards"></div>
+  <div class="section-title" style="margin-top:16px">Price Correlations (rolling 24 ticks)</div>
+  <div class="card" id="correlMatrix"></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- TAB 2: CRUDE OIL MARKETS                               -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="tab-content" id="tab-crude">
+  <div class="tab-timestamp"></div>
+  <div class="grid grid-2-1">
+    <div>
+      <div class="section-title">Benchmark Prices</div>
+      <div class="card"><table class="data-table" id="crudeBenchmarks"></table></div>
+      <div class="section-title">Key Differentials</div>
+      <div class="card"><table class="data-table" id="crudeDiffs"></table></div>
+    </div>
+    <div>
+      <div class="section-title">OPEC+ Context</div>
+      <div class="card" id="opecCard"></div>
+      <div class="section-title" style="margin-top:12px">Procurement Signals</div>
+      <div class="card" id="procureCard"></div>
+    </div>
+  </div>
+  <div class="section-title" style="margin-top:16px">Price History — Brent · Dubai · WTI (rolling 24 ticks)</div>
+  <div class="card" style="padding:14px 16px">
+    <div style="position:relative;height:250px"><canvas id="crudePriceChart"></canvas></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- TAB 3: FUEL PRODUCTS                                   -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="tab-content" id="tab-products">
+  <div class="tab-timestamp"></div>
+  <div class="section-title">Gasoline / Motor Spirit</div>
+  <div class="card"><table class="data-table" id="tblGasoline"></table></div>
+  <div class="section-title">Diesel / Gasoil</div>
+  <div class="card"><table class="data-table" id="tblDiesel"></table></div>
+  <div class="section-title">Jet Fuel / ATF</div>
+  <div class="card"><table class="data-table" id="tblJet"></table></div>
+  <div class="section-title">Fuel Oil</div>
+  <div class="card"><table class="data-table" id="tblFuelOil"></table></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- TAB 4: PETROCHEMICALS                                  -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="tab-content" id="tab-petchem">
+  <div class="tab-timestamp"></div>
+  <div class="grid grid-2">
+    <div>
+      <div class="section-title">Naphtha</div>
+      <div class="card"><table class="data-table" id="tblNaphtha"></table></div>
+      <div class="section-title">Olefins</div>
+      <div class="card"><table class="data-table" id="tblOlefins"></table></div>
+    </div>
+    <div>
+      <div class="section-title">Aromatics</div>
+      <div class="card"><table class="data-table" id="tblAromatics"></table></div>
+      <div class="section-title">Cracker Economics</div>
+      <div class="card" id="crackerEcon"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- TAB 5: CRACKS & MARGINS                                -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="tab-content" id="tab-cracks">
+  <div class="tab-timestamp"></div>
+  <div class="grid grid-2">
+    <div>
+      <div class="section-title">Product Crack Spreads vs Dubai</div>
+      <div class="card"><table class="data-table" id="tblCracks"></table></div>
+      <div class="section-title">Complex GRM Proxy</div>
+      <div class="card" id="grmCard"></div>
+      <div class="section-title" style="margin-top:12px">GRM Trend (last 100 ticks)</div>
+      <div class="card" style="padding:14px 16px">
+        <div style="position:relative;height:200px"><canvas id="grmTrendChart"></canvas></div>
+      </div>
+    </div>
+    <div>
+      <div class="section-title">What-If: Crude Cost Sensitivity</div>
+      <div class="card" id="whatIfCard"></div>
+      <div class="section-title" style="margin-top:12px">Scenario Builder</div>
+      <div class="card" id="scenarioBuilderCard" style="padding:12px;overflow-x:auto">
+        <table style="width:100%;min-width:460px;border-collapse:collapse;font-size:11px">
+          <thead>
+            <tr>
+              <th style="text-align:left;padding:6px 8px;color:var(--text-muted);font-size:9px;text-transform:uppercase;letter-spacing:.8px;border-bottom:1px solid var(--border)">Parameter</th>
+              <th style="padding:6px 8px;color:var(--cyan);text-align:center;font-size:9px;text-transform:uppercase;letter-spacing:.8px;border-bottom:1px solid var(--border)">A — Current</th>
+              <th style="padding:6px 8px;color:var(--text-secondary);text-align:center;font-size:9px;text-transform:uppercase;letter-spacing:.8px;border-bottom:1px solid var(--border)">B — Scenario</th>
+              <th style="padding:6px 8px;color:var(--text-secondary);text-align:center;font-size:9px;text-transform:uppercase;letter-spacing:.8px;border-bottom:1px solid var(--border)">C — Scenario</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="border-bottom:1px solid var(--border)">
+              <td style="padding:8px;color:var(--text-secondary)">Crude Cost ($/bbl)</td>
+              <td style="padding:8px;text-align:center;font-family:var(--mono)" id="scen_a_crude">—</td>
+              <td style="padding:6px;text-align:center"><input class="desk-input" id="scen_b_crude" type="number" step="0.5" style="width:76px" oninput="updateScenario()"></td>
+              <td style="padding:6px;text-align:center"><input class="desk-input" id="scen_c_crude" type="number" step="0.5" style="width:76px" oninput="updateScenario()"></td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--border)">
+              <td style="padding:8px;color:var(--text-secondary)">Product Adj (%)</td>
+              <td style="padding:8px;text-align:center;font-family:var(--mono);color:var(--text-muted)">0%</td>
+              <td style="padding:6px">
+                <div style="font-family:var(--mono);font-size:10px;text-align:center;color:var(--text-secondary);margin-bottom:2px"><span id="scen_b_adj_val">0%</span></div>
+                <input type="range" id="scen_b_adj" min="-10" max="10" step="0.5" value="0" oninput="document.getElementById('scen_b_adj_val').textContent=this.value+'%';updateScenario()">
+              </td>
+              <td style="padding:6px">
+                <div style="font-family:var(--mono);font-size:10px;text-align:center;color:var(--text-secondary);margin-bottom:2px"><span id="scen_c_adj_val">0%</span></div>
+                <input type="range" id="scen_c_adj" min="-10" max="10" step="0.5" value="0" oninput="document.getElementById('scen_c_adj_val').textContent=this.value+'%';updateScenario()">
+              </td>
+            </tr>
+            <tr style="border-bottom:2px solid var(--border-light)">
+              <td style="padding:8px;color:var(--text-secondary)">Freight ($/bbl)</td>
+              <td style="padding:8px;text-align:center;font-family:var(--mono);color:var(--text-muted)">0.00</td>
+              <td style="padding:6px;text-align:center"><input class="desk-input" id="scen_b_freight" type="number" step="0.1" value="0" style="width:76px" oninput="updateScenario()"></td>
+              <td style="padding:6px;text-align:center"><input class="desk-input" id="scen_c_freight" type="number" step="0.1" value="0" style="width:76px" oninput="updateScenario()"></td>
+            </tr>
+            <tr style="background:var(--bg-secondary);border-bottom:1px solid var(--border)">
+              <td style="padding:10px 8px;font-weight:600;color:var(--text-primary);font-size:11px">GRM ($/bbl)</td>
+              <td style="padding:10px 8px;text-align:center;font-family:var(--mono);font-weight:700;font-size:20px" id="scen_a_grm">—</td>
+              <td style="padding:10px 8px;text-align:center;font-family:var(--mono);font-weight:700;font-size:20px" id="scen_b_grm">—</td>
+              <td style="padding:10px 8px;text-align:center;font-family:var(--mono);font-weight:700;font-size:20px" id="scen_c_grm">—</td>
+            </tr>
+            <tr>
+              <td style="padding:6px 8px;color:var(--text-muted);font-size:10px">vs Base (A)</td>
+              <td style="padding:6px 8px;text-align:center;font-family:var(--mono);font-size:10px;color:var(--text-muted)">Base</td>
+              <td style="padding:6px 8px;text-align:center;font-family:var(--mono);font-size:11px" id="scen_b_vs">—</td>
+              <td style="padding:6px 8px;text-align:center;font-family:var(--mono);font-size:11px" id="scen_c_vs">—</td>
+            </tr>
+          </tbody>
+        </table>
+        <div style="margin-top:8px;font-size:9px;color:var(--text-muted)">Yield: 35% MS · 40% HSD · 10% ATF · 8% HSFO · 7% VLSFO · freight subtracted from GRM</div>
+      </div>
+      <div class="section-title" style="margin-top:12px">Regional Margin Comparison</div>
+      <div class="card"><table class="data-table" id="tblRegionalMargins"></table></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- TAB 6: FX & MACRO                                      -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="tab-content" id="tab-fx">
+  <div class="tab-timestamp"></div>
+  <div class="grid grid-2">
+    <div>
+      <div class="section-title">Currency Rates</div>
+      <div class="card"><table class="data-table" id="tblFx"></table></div>
+      <div class="section-title">FX Impact on GRM</div>
+      <div class="card" id="fxImpactCard"></div>
+    </div>
+    <div>
+      <div class="section-title">Macro Indicators</div>
+      <div class="card"><table class="data-table" id="tblMacro"></table></div>
+      <div class="section-title">Rate Environment</div>
+      <div class="card"><table class="data-table" id="tblRates"></table></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- TAB 7: LOGISTICS & FREIGHT                             -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="tab-content" id="tab-logistics">
+  <div class="tab-timestamp"></div>
+  <div class="grid grid-2">
+    <div>
+      <div class="section-title">Tanker Rates by Vessel Class</div>
+      <div class="card"><table class="data-table" id="tblFreight"></table></div>
+      <div class="section-title">Key Route Costs</div>
+      <div class="card"><table class="data-table" id="tblRoutes"></table></div>
+    </div>
+    <div>
+      <div class="section-title">Freight Scenario Calculator</div>
+      <div class="card" id="freightCalcCard"></div>
+      <div class="section-title">Port & Canal Indicators</div>
+      <div class="card" id="portCard"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- TAB 8: NEWS & ALERTS                                   -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="tab-content" id="tab-news">
+  <div class="tab-timestamp"></div>
+  <div class="grid grid-2">
+    <div>
+      <div class="section-title">Market-Moving Headlines</div>
+      <div class="card scroll-card" id="newsFeed" style="padding:0"></div>
+    </div>
+    <div>
+      <div class="section-title">Event Impact Tracker</div>
+      <div class="card scroll-card" id="eventTracker" style="padding:0"></div>
+      <div class="section-title" style="margin-top:12px">Category Filter</div>
+      <div id="newsFilters" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- TAB 9: ARCHITECTURE & DATA                             -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="tab-content" id="tab-architecture">
+  <div class="tab-timestamp"></div>
+  <div class="grid grid-2">
+    <div>
+      <div class="section-title">Data Sources & Status</div>
+      <div class="card scroll-card" id="archSources" style="padding:0"></div>
+      <div class="section-title">Refresh Log</div>
+      <div class="card scroll-card" id="refreshLog" style="padding:0;max-height:220px"></div>
+    </div>
+    <div>
+      <div class="section-title">Assumptions & Methodology</div>
+      <div class="card scroll-card" id="assumptions" style="padding:12px"></div>
+      <div class="section-title">System Architecture</div>
+      <div class="card" id="archDiagram" style="padding:14px"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ FOOTER ═══════ -->
+<div class="footer">
+  <span>RefineryDesk v1.0 — Built for integrated refinery trading desks</span>
+  <span id="lastRefresh">Last data refresh: --</span>
+</div>
+
+<!-- Chart.js — loaded before module so Chart is available on first renderAll() -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<!-- PDF export dependencies -->
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>

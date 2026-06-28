@@ -1,0 +1,13 @@
+{
+  "name": "RefineryDesk",
+  "short_name": "RefineryDesk",
+  "description": "Market intelligence dashboard for integrated refinery trading desks",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0e14",
+  "theme_color": "#0a0e14",
+  "orientation": "landscape",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
