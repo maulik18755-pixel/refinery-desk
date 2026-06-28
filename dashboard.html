@@ -497,6 +497,12 @@ const REF = {
 let STATE = {};
 let refreshLog = [];
 let fxLive = null;
+let eiaLive = false;
+let liveNews = null;
+
+// EIA API key — get a free key at https://www.eia.gov/opendata/
+// Leave empty to use reference data only (no EIA calls will be made)
+const EIA_API_KEY = '';
 
 function initState() {
   STATE = {};
@@ -1038,28 +1044,39 @@ function calcFreight() {
 }
 
 // ── 7h: NEWS & ALERTS ──
-function renderNews() {
-  const newsItems = [
-    { level:'critical', cat:'OPEC', headline:'OPEC+ extends 2.2 MMbpd voluntary cuts through Q3 2025; next review at July ministerial', time:'2h ago', impact:'Bullish crude — supports $70+ floor on Brent. Reduces spot availability of Arab Medium/Heavy grades.' },
-    { level:'critical', cat:'GEOPOLITICAL', headline:'Houthi drone strike damages Greek-flagged Aframax in southern Red Sea; crew evacuated', time:'4h ago', impact:'Freight surge on AG-West routes. Suez diversion adds 10-14 days and $2-3/bbl on WAF-to-India routes via Cape.' },
-    { level:'high', cat:'REFINERY', headline:'PetroChina Dalian 400K bpd refinery begins planned turnaround — 45-day maintenance window', time:'6h ago', impact:'Bearish crude demand from NEA. Bullish regional product cracks (gasoil, naphtha tightening).' },
-    { level:'high', cat:'POLICY', headline:'India cuts windfall tax on crude to zero; diesel export tax maintained at ₹1/litre', time:'8h ago', impact:'Positive for Indian E&P. Marginal negative for private refiner product export economics.' },
-    { level:'high', cat:'WEATHER', headline:'Hurricane season: Tropical Storm approaching USGC — Phillips 66 Sweeny, Motiva Port Arthur on watch', time:'10h ago', impact:'Bullish USGC gasoline and diesel. Could create transatlantic arb opportunities. Watch Colonial Pipeline nominations.' },
-    { level:'medium', cat:'PETCHEM', headline:'Asia naphtha crack recovers to 6-week high as steam crackers restart post-turnaround season', time:'12h ago', impact:'Naphtha demand strengthening. Supports naphtha-as-feed economics over fuel pooling.' },
-    { level:'medium', cat:'TRADE', headline:'India-Russia crude trade: ESPO blend discount narrows to $4/bbl below Brent from $8 in Q1', time:'14h ago', impact:'Reduced cost advantage of Russian grades. Indian refiners may shift marginal barrels back to AG sour.' },
-    { level:'low', cat:'MACRO', headline:'China PBoC holds LPR unchanged at 3.45%; industrial output growth slows to 5.0% YoY', time:'16h ago', impact:'Mildly bearish demand outlook. Supports range-bound pricing rather than breakout.' },
-    { level:'medium', cat:'FREIGHT', headline:'VLCC fleet utilization hits 92% — newbuild delivery schedule shows 18 vessels in H2 2025', time:'18h ago', impact:'Tight vessel supply supports elevated freight rates through summer. Long-haul routes most impacted.' },
-    { level:'low', cat:'STORAGE', headline:'Fujairah oil product stocks drop 8% WoW — middle distillate draws lead decline', time:'20h ago', impact:'Regional diesel/gasoil tightness. Supports MOPS gasoil assessment.' },
-    { level:'high', cat:'SANCTIONS', headline:'EU finalizes 14th sanctions package against Russia — targets shadow fleet insurance and STS transfers', time:'22h ago', impact:'Increases cost of Russian crude procurement. Benefits compliant refiners; tightens Urals supply to non-sanctioned buyers.' },
-    { level:'medium', cat:'DOMESTIC', headline:'BPCL, HPCL signal MS/HSD price adjustment within 48 hours amid rising OMC under-recoveries', time:'1d ago', impact:'May improve retail margins if passed through. Watch for demand elasticity response in Indian market.' },
-  ];
+// Curated reference headlines — used as fallback when live news is unavailable
+// SIMULATED: these are static reference examples, not live feed data
+const CURATED_NEWS = [
+  { level:'critical', cat:'OPEC', headline:'OPEC+ extends 2.2 MMbpd voluntary cuts through Q3 2025; next review at July ministerial', time:'2h ago', impact:'Bullish crude — supports $70+ floor on Brent. Reduces spot availability of Arab Medium/Heavy grades.' },
+  { level:'critical', cat:'GEOPOLITICAL', headline:'Houthi drone strike damages Greek-flagged Aframax in southern Red Sea; crew evacuated', time:'4h ago', impact:'Freight surge on AG-West routes. Suez diversion adds 10-14 days and $2-3/bbl on WAF-to-India routes via Cape.' },
+  { level:'high', cat:'REFINERY', headline:'PetroChina Dalian 400K bpd refinery begins planned turnaround — 45-day maintenance window', time:'6h ago', impact:'Bearish crude demand from NEA. Bullish regional product cracks (gasoil, naphtha tightening).' },
+  { level:'high', cat:'POLICY', headline:'India cuts windfall tax on crude to zero; diesel export tax maintained at ₹1/litre', time:'8h ago', impact:'Positive for Indian E&P. Marginal negative for private refiner product export economics.' },
+  { level:'high', cat:'WEATHER', headline:'Hurricane season: Tropical Storm approaching USGC — Phillips 66 Sweeny, Motiva Port Arthur on watch', time:'10h ago', impact:'Bullish USGC gasoline and diesel. Could create transatlantic arb opportunities. Watch Colonial Pipeline nominations.' },
+  { level:'medium', cat:'PETCHEM', headline:'Asia naphtha crack recovers to 6-week high as steam crackers restart post-turnaround season', time:'12h ago', impact:'Naphtha demand strengthening. Supports naphtha-as-feed economics over fuel pooling.' },
+  { level:'medium', cat:'TRADE', headline:'India-Russia crude trade: ESPO blend discount narrows to $4/bbl below Brent from $8 in Q1', time:'14h ago', impact:'Reduced cost advantage of Russian grades. Indian refiners may shift marginal barrels back to AG sour.' },
+  { level:'low', cat:'MACRO', headline:'China PBoC holds LPR unchanged at 3.45%; industrial output growth slows to 5.0% YoY', time:'16h ago', impact:'Mildly bearish demand outlook. Supports range-bound pricing rather than breakout.' },
+  { level:'medium', cat:'FREIGHT', headline:'VLCC fleet utilization hits 92% — newbuild delivery schedule shows 18 vessels in H2 2025', time:'18h ago', impact:'Tight vessel supply supports elevated freight rates through summer. Long-haul routes most impacted.' },
+  { level:'low', cat:'STORAGE', headline:'Fujairah oil product stocks drop 8% WoW — middle distillate draws lead decline', time:'20h ago', impact:'Regional diesel/gasoil tightness. Supports MOPS gasoil assessment.' },
+  { level:'high', cat:'SANCTIONS', headline:'EU finalizes 14th sanctions package against Russia — targets shadow fleet insurance and STS transfers', time:'22h ago', impact:'Increases cost of Russian crude procurement. Benefits compliant refiners; tightens Urals supply to non-sanctioned buyers.' },
+  { level:'medium', cat:'DOMESTIC', headline:'BPCL, HPCL signal MS/HSD price adjustment within 48 hours amid rising OMC under-recoveries', time:'1d ago', impact:'May improve retail margins if passed through. Watch for demand elasticity response in Indian market.' },
+];
 
-  document.getElementById('newsFeed').innerHTML = newsItems.map(n =>
-    `<div class="news-item"><div class="news-tag ${n.level}">${n.level}</div><div><div class="news-headline">${n.headline}</div><div class="news-meta">${n.cat} · ${n.time}</div></div></div>`
-  ).join('');
+function renderNews() {
+  const newsItems = liveNews || CURATED_NEWS;
+  const isLive = !!liveNews;
+
+  const feedLabel = isLive
+    ? '<span style="font-family:var(--mono);font-size:9px;color:var(--green);margin-left:6px">● LIVE</span>'
+    : '<span style="font-family:var(--mono);font-size:9px;color:var(--amber);margin-left:6px">● SIMULATED</span>';
+
+  document.getElementById('newsFeed').innerHTML =
+    `<div style="padding:6px 14px;border-bottom:1px solid var(--border);font-size:10px;color:var(--text-muted)">Source: ${isLive ? 'Google News RSS via /api/news' : 'Curated reference headlines'}${feedLabel}</div>` +
+    newsItems.map(n =>
+      `<div class="news-item"><div class="news-tag ${n.level}">${n.level}</div><div><div class="news-headline">${n.headline}</div><div class="news-meta">${n.cat} · ${n.time}${n.source ? ' · ' + n.source : ''}</div></div></div>`
+    ).join('');
 
   document.getElementById('eventTracker').innerHTML = newsItems.map(n =>
-    `<div class="arch-source"><div class="arch-name" style="font-size:11px">${n.headline.substring(0,80)}...</div><div class="arch-detail" style="font-size:10px"><strong>Market Impact:</strong> ${n.impact}</div></div>`
+    `<div class="arch-source"><div class="arch-name" style="font-size:11px">${n.headline.substring(0,80)}...</div><div class="arch-detail" style="font-size:10px"><strong>Market Impact:</strong> ${n.impact || '—'}</div></div>`
   ).join('');
 
   // Filters
@@ -1073,13 +1090,14 @@ function renderNews() {
 function renderArchitecture() {
   const sources = [
     { name:'Exchange Rate API', url:'open.er-api.com', type:'live', refresh:'Every 60s', covers:'USD/INR, EUR/USD, GBP/USD, CNY/USD, JPY/USD', note:'Free tier, CORS-enabled. Live API call on page load and every 60 seconds.' },
-    { name:'Crude Oil Benchmarks', url:'—', type:'simulated', refresh:'Every 5s (sim tick)', covers:'Brent, WTI, Dubai, Oman, Murban, Basrah Light, Arab Light, Upper Zakum, ESPO', note:'Reference prices seeded from recent Platts/Argus actuals. Simulated tick updates for UX. Production: connect to Platts eWindow, Argus, or ICE API.' },
+    { name:'EIA Crude Spot Prices (Brent & WTI)', url:'api.eia.gov', type: eiaLive ? 'live' : 'planned', refresh: eiaLive ? 'Every 300s' : 'Requires EIA_API_KEY', covers:'Brent (RBRTE), WTI (RWTC) — daily spot prices', note: eiaLive ? 'Live daily spot prices from EIA Open Data API v2. Brent and WTI updated every 5 minutes.' : 'Set EIA_API_KEY constant in dashboard.html to enable. Free key at eia.gov/opendata. Dubai/other benchmarks remain simulated.' },
+    { name:'Crude Oil Benchmarks (other grades)', url:'—', type:'simulated', refresh:'Every 5s (sim tick)', covers:'Dubai, Oman, Murban, Basrah Light, Arab Light, Upper Zakum, ESPO', note:'Reference prices seeded from recent Platts/Argus actuals. Simulated tick updates for UX. Production: connect to Platts eWindow, Argus, or ICE API.' },
+    { name:'News RSS Feed', url:'/api/news (Flask proxy)', type: liveNews ? 'live' : 'planned', refresh: liveNews ? 'Every 5 min' : 'Requires Flask server', covers:'Oil, refinery, crude, OPEC headlines from Google News RSS', note: liveNews ? 'Live RSS feed via server.py proxy. Run: python3 server.py' : 'Start server.py (Flask) to enable live news. Falls back to curated reference headlines automatically.' },
     { name:'Product Prices', url:'—', type:'simulated', refresh:'Every 5s (sim tick)', covers:'Gasoline, Diesel, Jet, Fuel Oil across MOPS/NWE/USGC', note:'Reference prices from recent MOPS/Platts assessments. Production: Platts MOC, Argus, or OPIS feeds.' },
     { name:'Petrochemical Feedstock', url:'—', type:'simulated', refresh:'Every 5s (sim tick)', covers:'Naphtha, Ethylene, Propylene, BTX, Paraxylene', note:'Reference from ICIS/Platts petchem assessments. Production: ICIS, Platts, or Argus petchem data feeds.' },
     { name:'Freight / Tanker Rates', url:'—', type:'simulated', refresh:'Every 5s (sim tick)', covers:'VLCC, Suezmax, Aframax, MR rates on key routes', note:'Reference from Baltic Exchange and Clarksons. Production: Baltic Exchange API, Clarksons SIN.' },
     { name:'OPEC+ Data', url:'—', type:'simulated', refresh:'Manual (static)', covers:'Production quotas, compliance, meeting schedule', note:'Reference data from OPEC Monthly Oil Market Report. Production: OPEC API, Kpler, Vortexa.' },
     { name:'Macro Indicators', url:'—', type:'simulated', refresh:'Manual (static)', covers:'GDP, PMI, CPI, policy rates', note:'Reference from RBI, ISM, NBS. Production: Bloomberg, Reuters Eikon, CEIC.' },
-    { name:'News Headlines', url:'—', type:'simulated', refresh:'Manual (curated)', covers:'Market-moving events across OPEC, geopolitical, refinery, policy, weather', note:'Curated reference headlines. Production: Reuters News API, Bloomberg Terminal, Platts News, Argus Media.' },
     { name:'Port / Canal Status', url:'—', type:'simulated', refresh:'Manual (static)', covers:'Suez, Hormuz, Malacca, Indian ports', note:'Reference indicators. Production: MarineTraffic API, Kpler port data, vessel AIS tracking.' },
   ];
   document.getElementById('archSources').innerHTML = sources.map(s =>
@@ -1174,6 +1192,88 @@ async function fetchFxRates() {
   }
 }
 
+// ── 2A: EIA CRUDE SPOT PRICES ──
+// Fetches Brent (RBRTE) and WTI (RWTC) daily spot prices from EIA Open Data API v2.
+// Requires EIA_API_KEY. Falls back silently to reference data if key missing or CORS/network error.
+async function fetchEIACrude() {
+  if (!EIA_API_KEY) return;
+  try {
+    const url = `https://api.eia.gov/v2/petroleum/pri/spt/data/?api_key=${EIA_API_KEY}` +
+      `&frequency=daily&data[0]=value` +
+      `&facets[series][]=RBRTE&facets[series][]=RWTC` +
+      `&sort[0][column]=period&sort[0][direction]=desc&length=5`;
+    const resp = await fetch(url);
+    if (!resp.ok) throw new Error('EIA HTTP ' + resp.status);
+    const json = await resp.json();
+    const rows = json?.response?.data || [];
+    const updated = new Set();
+    for (const row of rows) {
+      const val = parseFloat(row.value);
+      if (!val || isNaN(val)) continue;
+      if (row.series === 'RBRTE' && !updated.has('brent') && STATE['crude.brent']) {
+        STATE['crude.brent'].current = val;
+        STATE['crude.brent'].base = val;
+        updated.add('brent');
+      }
+      if (row.series === 'RWTC' && !updated.has('wti') && STATE['crude.wti']) {
+        STATE['crude.wti'].current = val;
+        STATE['crude.wti'].base = val;
+        updated.add('wti');
+      }
+      if (updated.size === 2) break;
+    }
+    if (updated.size > 0) {
+      eiaLive = true;
+      addRefreshLog('EIA API (api.eia.gov)', 'live',
+        `Brent: $${STATE['crude.brent'].current.toFixed(2)} · WTI: $${STATE['crude.wti'].current.toFixed(2)}`);
+    }
+  } catch(e) {
+    console.warn('EIA fetch failed:', e);
+    addRefreshLog('EIA API', 'simulated', 'Fetch failed — using reference data. ' + e.message);
+  }
+}
+
+// ── 2B: NEWS RSS FEED (via Flask /api/news proxy) ──
+// Classifies headlines by keyword for level/category display
+function classifyNews(title) {
+  const t = title.toUpperCase();
+  if (/OPEC|PRODUCTION CUT|OUTPUT QUOTA/.test(t))           return { cat:'OPEC',       level:'high' };
+  if (/SANCTION|IRAN|RUSSIA|HOUTHI|WAR|CONFLICT/.test(t))  return { cat:'GEOPOLITIC',  level:'high' };
+  if (/REFINER|TURNAROUND|MAINTENAN|OUTAGE|SHUTDOWN/.test(t)) return { cat:'REFINERY',  level:'medium' };
+  if (/HURRICANE|STORM|WEATHER|FLOOD|TYPHOON/.test(t))      return { cat:'WEATHER',     level:'medium' };
+  if (/FEDERAL|FED |ECB|RBI|INTEREST RATE|INFLATION/.test(t)) return { cat:'MACRO',    level:'low' };
+  if (/NAPHTHA|ETHYLENE|PROPYLENE|PETCHEM|CRACKER/.test(t)) return { cat:'PETCHEM',    level:'medium' };
+  if (/FREIGHT|TANKER|VLCC|VESSEL|SHIP/.test(t))            return { cat:'FREIGHT',     level:'medium' };
+  if (/INDIA|BPCL|HPCL|IOCL|RELIANCE|IOC/.test(t))         return { cat:'DOMESTIC',    level:'medium' };
+  return { cat:'CRUDE', level:'medium' };
+}
+
+function newsAge(dateStr) {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  if (isNaN(d)) return '';
+  const h = Math.floor((Date.now() - d) / 3600000);
+  return h < 1 ? Math.floor((Date.now() - d) / 60000) + 'm ago' : h < 24 ? h + 'h ago' : Math.floor(h / 24) + 'd ago';
+}
+
+async function fetchNews() {
+  try {
+    const resp = await fetch('/api/news');
+    if (!resp.ok) throw new Error('News proxy HTTP ' + resp.status);
+    const items = await resp.json();
+    if (Array.isArray(items) && items.length > 0) {
+      liveNews = items.map(n => {
+        const { cat, level } = classifyNews(n.title || '');
+        return { level, cat, headline: n.title || '', time: newsAge(n.pubDate) || 'recent', source: n.source || '', impact: '' };
+      });
+      addRefreshLog('News RSS (/api/news)', 'live', `${items.length} headlines loaded from Google News RSS`);
+    }
+  } catch(e) {
+    console.warn('News fetch failed (server.py not running?):', e.message);
+    addRefreshLog('News RSS', 'simulated', 'Using curated headlines — start server.py to enable live feed');
+  }
+}
+
 function addRefreshLog(source, status, detail) {
   const now = new Date();
   const time = now.toLocaleTimeString('en-GB', {hour:'2-digit',minute:'2-digit',second:'2-digit',timeZone:'Asia/Kolkata'});
@@ -1214,15 +1314,19 @@ rotateAlert();
 updateClocks();
 updateMarketStatus();
 
-// Fetch live FX immediately
+// Fetch live data immediately on load
 fetchFxRates();
+fetchEIACrude();
+fetchNews();
 
 // Intervals
-setInterval(mainLoop, 5000);        // Data tick every 5s
-setInterval(updateClocks, 1000);    // Clock every 1s
+setInterval(mainLoop, 5000);          // Data tick every 5s
+setInterval(updateClocks, 1000);      // Clock every 1s
 setInterval(updateMarketStatus, 30000); // Market status every 30s
-setInterval(rotateAlert, 12000);    // Alert rotation every 12s
-setInterval(fetchFxRates, 60000);   // FX API every 60s
+setInterval(rotateAlert, 12000);      // Alert rotation every 12s
+setInterval(fetchFxRates, 60000);     // FX API every 60s
+setInterval(fetchEIACrude, 300000);   // EIA crude every 5 min
+setInterval(fetchNews, 300000);       // News RSS every 5 min
 
 // Initial log entries
 addRefreshLog('System', 'live', 'Dashboard initialized');
