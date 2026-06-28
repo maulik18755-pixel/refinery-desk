@@ -58,9 +58,10 @@ a{color:var(--blue);text-decoration:none}
 .tab-btn.active{color:var(--cyan);border-bottom-color:var(--cyan);font-weight:600}
 
 /* ───── TAB CONTENT ───── */
-.tab-content{display:none;padding:16px 20px;animation:fadeIn .2s}
+.tab-content{display:none;padding:16px 20px;animation:fadeIn .2s;position:relative}
 .tab-content.active{display:block}
 @keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+.tab-timestamp{position:absolute;top:16px;right:20px;font-family:var(--mono);font-size:9px;color:var(--text-muted);letter-spacing:.5px;pointer-events:none}
 
 /* ───── GRID ───── */
 .grid{display:grid;gap:12px}
@@ -158,6 +159,51 @@ button.desk-btn:hover{opacity:.85}
 
 /* ───── FOOTER ───── */
 .footer{padding:10px 20px;font-size:10px;color:var(--text-muted);border-top:1px solid var(--border);display:flex;justify-content:space-between;background:var(--bg-secondary)}
+
+/* ───── TAB KEYBOARD HINT ───── */
+.tab-hint{font-size:9px;color:var(--text-muted);font-family:var(--mono);padding:0 10px 0 6px;align-self:center;white-space:nowrap;margin-left:auto;flex-shrink:0;letter-spacing:.5px}
+
+/* ───── COMPACT TOGGLE BUTTON ───── */
+.compact-btn{font-family:var(--mono);font-size:10px;font-weight:600;color:var(--text-muted);background:none;border:1px solid var(--border);border-radius:var(--radius);padding:4px 10px;cursor:pointer;letter-spacing:.8px;transition:all .15s}
+.compact-btn:hover{color:var(--text-primary);border-color:var(--border-light)}
+.compact-btn.active{color:var(--cyan);border-color:var(--cyan)}
+
+/* ───── COMPACT MODE ───── */
+body.compact .card{padding:10px 12px}
+body.compact .grid{gap:8px}
+body.compact .tab-content{padding:10px 16px}
+body.compact .price-big{font-size:27px}
+body.compact .price-med{font-size:17px}
+body.compact .kpi-item{padding:7px 10px}
+body.compact .kpi-item .kpi-value{font-size:15px}
+body.compact .section-title{font-size:12px;margin:12px 0 8px}
+body.compact .data-table th{font-size:9px;padding:6px 8px}
+body.compact .data-table td{padding:5px 8px;font-size:11px}
+body.compact .card-title{font-size:9px}
+body.compact .news-headline{font-size:11px}
+body.compact .arch-detail{font-size:10px}
+
+/* ───── MOBILE RESPONSIVE ───── */
+@media(max-width:768px){
+  /* Header wraps to two rows */
+  .header{flex-wrap:wrap;gap:8px;padding:8px 12px}
+  .header-left{flex:1 1 100%}
+  .header-right{flex:1 1 100%;justify-content:flex-start;flex-wrap:wrap;gap:8px}
+  .clock{min-width:auto;text-align:left}
+
+  /* Tab bar momentum scroll on touch */
+  .tab-bar{-webkit-overflow-scrolling:touch}
+
+  /* KPI strip: 2-column grid (2×4 for 8 items) */
+  .kpi-strip{flex-wrap:wrap;background:transparent;gap:4px}
+  .kpi-item{flex:1 1 calc(50% - 2px);min-width:0;border:1px solid var(--border);border-radius:var(--radius)}
+
+  /* Tighter tab content padding */
+  .tab-content{padding:10px 12px}
+
+  /* Footer stacks vertically */
+  .footer{flex-direction:column;gap:4px}
+}
 </style>
 </head>
 <body>
@@ -170,6 +216,7 @@ button.desk-btn:hover{opacity:.85}
   </div>
   <div class="header-right">
     <div class="refresh-indicator"><div class="pulse"></div><span>LIVE</span></div>
+    <button class="compact-btn" id="compactBtn" onclick="toggleCompact()">COMPACT</button>
     <div class="clock" id="clockIST"><div class="label">IST</div><div id="istTime">--:--:--</div></div>
     <div class="clock" id="clockSGT"><div class="label">SGT</div><div id="sgtTime">--:--:--</div></div>
     <div class="clock" id="clockLDN"><div class="label">LDN</div><div id="ldnTime">--:--:--</div></div>
@@ -194,12 +241,14 @@ button.desk-btn:hover{opacity:.85}
   <button class="tab-btn" data-tab="logistics">Logistics & Freight</button>
   <button class="tab-btn" data-tab="news">News & Alerts</button>
   <button class="tab-btn" data-tab="architecture">Architecture & Data</button>
+  <span class="tab-hint">Press 1–9</span>
 </div>
 
 <!-- ═══════════════════════════════════════════════════════ -->
 <!-- TAB 1: COMMAND CENTER                                  -->
 <!-- ═══════════════════════════════════════════════════════ -->
 <div class="tab-content active" id="tab-command">
+  <div class="tab-timestamp"></div>
   <div class="kpi-strip" id="kpiStrip"></div>
   <div class="grid grid-4" id="commandCards"></div>
   <div class="section-title" style="margin-top:16px">Key Crack Spreads vs Dubai</div>
@@ -212,6 +261,7 @@ button.desk-btn:hover{opacity:.85}
 <!-- TAB 2: CRUDE OIL MARKETS                               -->
 <!-- ═══════════════════════════════════════════════════════ -->
 <div class="tab-content" id="tab-crude">
+  <div class="tab-timestamp"></div>
   <div class="grid grid-2-1">
     <div>
       <div class="section-title">Benchmark Prices</div>
@@ -232,6 +282,7 @@ button.desk-btn:hover{opacity:.85}
 <!-- TAB 3: FUEL PRODUCTS                                   -->
 <!-- ═══════════════════════════════════════════════════════ -->
 <div class="tab-content" id="tab-products">
+  <div class="tab-timestamp"></div>
   <div class="section-title">Gasoline / Motor Spirit</div>
   <div class="card"><table class="data-table" id="tblGasoline"></table></div>
   <div class="section-title">Diesel / Gasoil</div>
@@ -246,6 +297,7 @@ button.desk-btn:hover{opacity:.85}
 <!-- TAB 4: PETROCHEMICALS                                  -->
 <!-- ═══════════════════════════════════════════════════════ -->
 <div class="tab-content" id="tab-petchem">
+  <div class="tab-timestamp"></div>
   <div class="grid grid-2">
     <div>
       <div class="section-title">Naphtha</div>
@@ -266,6 +318,7 @@ button.desk-btn:hover{opacity:.85}
 <!-- TAB 5: CRACKS & MARGINS                                -->
 <!-- ═══════════════════════════════════════════════════════ -->
 <div class="tab-content" id="tab-cracks">
+  <div class="tab-timestamp"></div>
   <div class="grid grid-2">
     <div>
       <div class="section-title">Product Crack Spreads vs Dubai</div>
@@ -286,6 +339,7 @@ button.desk-btn:hover{opacity:.85}
 <!-- TAB 6: FX & MACRO                                      -->
 <!-- ═══════════════════════════════════════════════════════ -->
 <div class="tab-content" id="tab-fx">
+  <div class="tab-timestamp"></div>
   <div class="grid grid-2">
     <div>
       <div class="section-title">Currency Rates</div>
@@ -306,6 +360,7 @@ button.desk-btn:hover{opacity:.85}
 <!-- TAB 7: LOGISTICS & FREIGHT                             -->
 <!-- ═══════════════════════════════════════════════════════ -->
 <div class="tab-content" id="tab-logistics">
+  <div class="tab-timestamp"></div>
   <div class="grid grid-2">
     <div>
       <div class="section-title">Tanker Rates by Vessel Class</div>
@@ -326,6 +381,7 @@ button.desk-btn:hover{opacity:.85}
 <!-- TAB 8: NEWS & ALERTS                                   -->
 <!-- ═══════════════════════════════════════════════════════ -->
 <div class="tab-content" id="tab-news">
+  <div class="tab-timestamp"></div>
   <div class="grid grid-2">
     <div>
       <div class="section-title">Market-Moving Headlines</div>
@@ -344,6 +400,7 @@ button.desk-btn:hover{opacity:.85}
 <!-- TAB 9: ARCHITECTURE & DATA                             -->
 <!-- ═══════════════════════════════════════════════════════ -->
 <div class="tab-content" id="tab-architecture">
+  <div class="tab-timestamp"></div>
   <div class="grid grid-2">
     <div>
       <div class="section-title">Data Sources & Status</div>
@@ -545,14 +602,35 @@ function rotateAlert() {
 // ──────────────────────────────────────────────
 // SECTION 6: TAB MANAGEMENT
 // ──────────────────────────────────────────────
-document.querySelectorAll('.tab-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-    btn.classList.add('active');
-    document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
-  });
+const TAB_ORDER = ['command','crude','products','petchem','cracks','fx','logistics','news','architecture'];
+
+function switchTab(idx) {
+  const tabs = document.querySelectorAll('.tab-btn');
+  const contents = document.querySelectorAll('.tab-content');
+  tabs.forEach(b => b.classList.remove('active'));
+  contents.forEach(c => c.classList.remove('active'));
+  tabs[idx].classList.add('active');
+  document.getElementById('tab-' + TAB_ORDER[idx]).classList.add('active');
+  tabs[idx].scrollIntoView({block:'nearest',inline:'nearest'});
+}
+
+document.querySelectorAll('.tab-btn').forEach((btn, i) => {
+  btn.addEventListener('click', () => switchTab(i));
 });
+
+// Keyboard shortcuts: digits 1-9 switch tabs
+document.addEventListener('keydown', e => {
+  const n = parseInt(e.key);
+  if (n >= 1 && n <= 9 && !e.target.matches('input,select,textarea')) switchTab(n - 1);
+});
+
+// ── 1D: COMPACT MODE ──
+let compactOn = false;
+function toggleCompact() {
+  compactOn = !compactOn;
+  document.body.classList.toggle('compact', compactOn);
+  document.getElementById('compactBtn').classList.toggle('active', compactOn);
+}
 
 // ──────────────────────────────────────────────
 // SECTION 7: RENDER FUNCTIONS
@@ -1116,6 +1194,8 @@ function renderAll() {
   renderLogistics();
   renderNews();
   renderArchitecture();
+  const tsStr = 'Updated: ' + new Date().toLocaleTimeString('en-GB', {hour:'2-digit',minute:'2-digit',second:'2-digit',timeZone:'Asia/Kolkata'}) + ' IST';
+  document.querySelectorAll('.tab-timestamp').forEach(el => el.textContent = tsStr);
   document.getElementById('lastRefresh').textContent = 'Last data refresh: ' + new Date().toLocaleTimeString('en-GB', {hour:'2-digit',minute:'2-digit',second:'2-digit',timeZone:'Asia/Kolkata'}) + ' IST';
 }
 
