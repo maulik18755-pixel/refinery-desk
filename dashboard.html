@@ -1,0 +1,1152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Refinery Trading Desk — Market Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ───── RESET & BASE ───── */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg-primary:#0a0e14;--bg-secondary:#111820;--bg-card:#151c25;--bg-card-hover:#1a2230;
+  --border:#1e2a38;--border-light:#2a3a4e;
+  --text-primary:#e2e8f0;--text-secondary:#8899aa;--text-muted:#5a6a7a;
+  --green:#22c55e;--green-bg:rgba(34,197,94,.08);--green-dim:#16a34a;
+  --red:#ef4444;--red-bg:rgba(239,68,68,.08);--red-dim:#dc2626;
+  --amber:#f59e0b;--amber-bg:rgba(245,158,11,.08);
+  --blue:#3b82f6;--blue-bg:rgba(59,130,246,.08);
+  --cyan:#06b6d4;
+  --mono:'JetBrains Mono',monospace;--sans:'Inter',system-ui,sans-serif;
+  --radius:6px;
+}
+html{font-size:13px;background:var(--bg-primary);color:var(--text-primary);font-family:var(--sans)}
+body{min-height:100vh}
+a{color:var(--blue);text-decoration:none}
+
+/* ───── HEADER ───── */
+.header{display:flex;align-items:center;justify-content:space-between;padding:10px 20px;background:var(--bg-secondary);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100}
+.header-left{display:flex;align-items:center;gap:16px}
+.logo{font-family:var(--mono);font-weight:700;font-size:15px;letter-spacing:.5px;color:var(--text-primary)}
+.logo span{color:var(--cyan)}
+.market-status{display:flex;gap:12px;font-size:11px;color:var(--text-secondary)}
+.market-status .dot{width:6px;height:6px;border-radius:50%;display:inline-block;margin-right:4px;vertical-align:middle}
+.dot.open{background:var(--green);box-shadow:0 0 6px var(--green)}
+.dot.closed{background:var(--red-dim)}
+.dot.pre{background:var(--amber)}
+.header-right{display:flex;align-items:center;gap:16px;font-family:var(--mono);font-size:11px;color:var(--text-secondary)}
+.clock{min-width:140px;text-align:right}
+.clock .label{color:var(--text-muted);font-size:9px;text-transform:uppercase;letter-spacing:1px}
+.refresh-indicator{display:flex;align-items:center;gap:6px;font-size:10px}
+.pulse{width:8px;height:8px;border-radius:50%;background:var(--green);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* ───── ALERT BANNER ───── */
+.alert-banner{background:linear-gradient(90deg,rgba(239,68,68,.12),rgba(239,68,68,.04));border-bottom:1px solid rgba(239,68,68,.2);padding:6px 20px;font-size:11px;display:flex;align-items:center;gap:10px;overflow:hidden;height:28px}
+.alert-banner.amber{background:linear-gradient(90deg,rgba(245,158,11,.12),rgba(245,158,11,.04));border-color:rgba(245,158,11,.2)}
+.alert-banner .tag{font-family:var(--mono);font-weight:600;font-size:9px;text-transform:uppercase;letter-spacing:1px;padding:2px 6px;border-radius:3px;flex-shrink:0}
+.alert-banner .tag.urgent{background:rgba(239,68,68,.2);color:var(--red)}
+.alert-banner .tag.watch{background:rgba(245,158,11,.2);color:var(--amber)}
+.alert-ticker{white-space:nowrap;animation:ticker 30s linear infinite}
+@keyframes ticker{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+
+/* ───── TABS ───── */
+.tab-bar{display:flex;background:var(--bg-secondary);border-bottom:1px solid var(--border);padding:0 12px;overflow-x:auto;scrollbar-width:none}
+.tab-bar::-webkit-scrollbar{display:none}
+.tab-btn{font-family:var(--sans);font-size:11px;font-weight:500;color:var(--text-secondary);padding:10px 14px;border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;transition:all .15s}
+.tab-btn:hover{color:var(--text-primary);background:rgba(255,255,255,.03)}
+.tab-btn.active{color:var(--cyan);border-bottom-color:var(--cyan);font-weight:600}
+
+/* ───── TAB CONTENT ───── */
+.tab-content{display:none;padding:16px 20px;animation:fadeIn .2s}
+.tab-content.active{display:block}
+@keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+
+/* ───── GRID ───── */
+.grid{display:grid;gap:12px}
+.grid-4{grid-template-columns:repeat(4,1fr)}
+.grid-3{grid-template-columns:repeat(3,1fr)}
+.grid-2{grid-template-columns:repeat(2,1fr)}
+.grid-2-1{grid-template-columns:2fr 1fr}
+.grid-1-2{grid-template-columns:1fr 2fr}
+@media(max-width:1200px){.grid-4{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:768px){.grid-4,.grid-3,.grid-2,.grid-2-1,.grid-1-2{grid-template-columns:1fr}}
+
+/* ───── CARDS ───── */
+.card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;transition:border-color .15s}
+.card:hover{border-color:var(--border-light)}
+.card-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.card-title{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:1.2px;color:var(--text-secondary)}
+.card-badge{font-family:var(--mono);font-size:9px;padding:2px 6px;border-radius:3px;background:var(--bg-secondary);color:var(--text-muted)}
+
+/* ───── PRICE DISPLAY ───── */
+.price-big{font-family:var(--mono);font-size:28px;font-weight:700;line-height:1.1;margin:4px 0}
+.price-med{font-family:var(--mono);font-size:18px;font-weight:600}
+.price-sm{font-family:var(--mono);font-size:13px;font-weight:500}
+.price-change{font-family:var(--mono);font-size:11px;font-weight:500;display:inline-flex;align-items:center;gap:3px}
+.up{color:var(--green)}.down{color:var(--red)}.flat{color:var(--text-muted)}
+.arrow::before{font-size:9px}
+.up .arrow::before{content:'▲'}.down .arrow::before{content:'▼'}.flat .arrow::before{content:'–'}
+.price-row{display:flex;justify-content:space-between;align-items:baseline;padding:6px 0;border-bottom:1px solid var(--border)}
+.price-row:last-child{border-bottom:none}
+
+/* ───── TABLES ───── */
+.data-table{width:100%;border-collapse:collapse;font-size:12px}
+.data-table th{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted);text-align:left;padding:8px 10px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--bg-card)}
+.data-table td{padding:7px 10px;border-bottom:1px solid var(--border);font-family:var(--mono);font-size:12px}
+.data-table tr:hover td{background:rgba(255,255,255,.02)}
+.data-table .label-cell{font-family:var(--sans);font-weight:500;color:var(--text-primary)}
+.data-table .sub{color:var(--text-secondary);font-size:10px;font-family:var(--sans)}
+
+/* ───── SECTION TITLES ───── */
+.section-title{font-size:13px;font-weight:600;color:var(--text-primary);margin:16px 0 10px;display:flex;align-items:center;gap:8px}
+.section-title::before{content:'';width:3px;height:14px;background:var(--cyan);border-radius:2px}
+.section-subtitle{font-size:11px;color:var(--text-secondary);margin-bottom:12px}
+
+/* ───── SPARKLINE (CSS) ───── */
+.sparkline-container{height:32px;display:flex;align-items:flex-end;gap:1px;padding-top:4px}
+.spark-bar{flex:1;min-width:2px;background:var(--cyan);border-radius:1px 1px 0 0;opacity:.5;transition:height .3s}
+.spark-bar.up{background:var(--green)}.spark-bar.down{background:var(--red)}
+
+/* ───── SLIDER ───── */
+.slider-group{margin:12px 0}
+.slider-label{display:flex;justify-content:space-between;font-size:11px;color:var(--text-secondary);margin-bottom:6px}
+input[type="range"]{width:100%;-webkit-appearance:none;height:4px;background:var(--border);border-radius:2px;outline:none}
+input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:var(--cyan);cursor:pointer}
+select.desk-select{font-family:var(--mono);font-size:11px;background:var(--bg-secondary);color:var(--text-primary);border:1px solid var(--border);border-radius:var(--radius);padding:6px 10px;outline:none}
+select.desk-select:focus{border-color:var(--cyan)}
+input.desk-input{font-family:var(--mono);font-size:11px;background:var(--bg-secondary);color:var(--text-primary);border:1px solid var(--border);border-radius:var(--radius);padding:6px 10px;outline:none;width:100px}
+input.desk-input:focus{border-color:var(--cyan)}
+button.desk-btn{font-family:var(--sans);font-size:11px;font-weight:600;background:var(--cyan);color:#000;border:none;border-radius:var(--radius);padding:7px 16px;cursor:pointer;transition:opacity .15s}
+button.desk-btn:hover{opacity:.85}
+
+/* ───── NEWS ITEMS ───── */
+.news-item{padding:10px 14px;border-bottom:1px solid var(--border);display:flex;gap:10px;cursor:default;transition:background .1s}
+.news-item:hover{background:rgba(255,255,255,.02)}
+.news-tag{font-family:var(--mono);font-size:8px;font-weight:600;text-transform:uppercase;letter-spacing:1px;padding:2px 6px;border-radius:3px;flex-shrink:0;height:fit-content;margin-top:2px}
+.news-tag.critical{background:rgba(239,68,68,.15);color:var(--red)}
+.news-tag.high{background:rgba(245,158,11,.15);color:var(--amber)}
+.news-tag.medium{background:rgba(59,130,246,.15);color:var(--blue)}
+.news-tag.low{background:rgba(34,197,94,.15);color:var(--green)}
+.news-headline{font-size:12px;font-weight:500;line-height:1.4}
+.news-meta{font-size:10px;color:var(--text-muted);margin-top:3px}
+.news-category{font-size:9px;font-family:var(--mono);color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px}
+
+/* ───── ARCHITECTURE TAB ───── */
+.arch-source{padding:12px 16px;border-bottom:1px solid var(--border)}
+.arch-source:last-child{border-bottom:none}
+.arch-name{font-weight:600;font-size:12px;margin-bottom:4px}
+.arch-detail{font-size:11px;color:var(--text-secondary);line-height:1.5}
+.arch-status{display:inline-flex;align-items:center;gap:4px;font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:3px}
+.arch-status.live{background:var(--green-bg);color:var(--green)}
+.arch-status.simulated{background:var(--amber-bg);color:var(--amber)}
+.arch-status.planned{background:var(--blue-bg);color:var(--blue)}
+.assumption-item{padding:8px 0;border-bottom:1px solid var(--border);font-size:12px;line-height:1.5;color:var(--text-secondary)}
+.assumption-item strong{color:var(--text-primary);font-weight:500}
+
+/* ───── KPI ROW ───── */
+.kpi-strip{display:flex;gap:1px;background:var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:12px}
+.kpi-item{flex:1;background:var(--bg-card);padding:10px 12px;text-align:center}
+.kpi-item .kpi-label{font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);margin-bottom:4px}
+.kpi-item .kpi-value{font-family:var(--mono);font-size:16px;font-weight:600}
+.kpi-item .kpi-delta{font-family:var(--mono);font-size:10px;margin-top:2px}
+
+/* ───── SCROLLABLE CARD ───── */
+.scroll-card{max-height:380px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--border) transparent}
+.scroll-card::-webkit-scrollbar{width:4px}
+.scroll-card::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+
+/* ───── FOOTER ───── */
+.footer{padding:10px 20px;font-size:10px;color:var(--text-muted);border-top:1px solid var(--border);display:flex;justify-content:space-between;background:var(--bg-secondary)}
+</style>
+</head>
+<body>
+
+<!-- ═══════ HEADER ═══════ -->
+<div class="header">
+  <div class="header-left">
+    <div class="logo">REFINERY<span>DESK</span> <span style="font-weight:300;font-size:10px;color:var(--text-muted);margin-left:4px">v1.0</span></div>
+    <div class="market-status" id="marketStatus"></div>
+  </div>
+  <div class="header-right">
+    <div class="refresh-indicator"><div class="pulse"></div><span>LIVE</span></div>
+    <div class="clock" id="clockIST"><div class="label">IST</div><div id="istTime">--:--:--</div></div>
+    <div class="clock" id="clockSGT"><div class="label">SGT</div><div id="sgtTime">--:--:--</div></div>
+    <div class="clock" id="clockLDN"><div class="label">LDN</div><div id="ldnTime">--:--:--</div></div>
+    <div class="clock" id="clockNYC"><div class="label">NYC</div><div id="nycTime">--:--:--</div></div>
+  </div>
+</div>
+
+<!-- ═══════ ALERT BANNER ═══════ -->
+<div class="alert-banner" id="alertBanner">
+  <span class="tag urgent" id="alertTag">ALERT</span>
+  <div style="overflow:hidden;flex:1"><div class="alert-ticker" id="alertTicker"></div></div>
+</div>
+
+<!-- ═══════ TAB BAR ═══════ -->
+<div class="tab-bar" id="tabBar">
+  <button class="tab-btn active" data-tab="command">⬡ Command Center</button>
+  <button class="tab-btn" data-tab="crude">Crude Oil</button>
+  <button class="tab-btn" data-tab="products">Fuel Products</button>
+  <button class="tab-btn" data-tab="petchem">Petrochemicals</button>
+  <button class="tab-btn" data-tab="cracks">Cracks & Margins</button>
+  <button class="tab-btn" data-tab="fx">FX & Macro</button>
+  <button class="tab-btn" data-tab="logistics">Logistics & Freight</button>
+  <button class="tab-btn" data-tab="news">News & Alerts</button>
+  <button class="tab-btn" data-tab="architecture">Architecture & Data</button>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- TAB 1: COMMAND CENTER                                  -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="tab-content active" id="tab-command">
+  <div class="kpi-strip" id="kpiStrip"></div>
+  <div class="grid grid-4" id="commandCards"></div>
+  <div class="section-title" style="margin-top:16px">Key Crack Spreads vs Dubai</div>
+  <div class="grid grid-4" id="crackCards"></div>
+  <div class="section-title" style="margin-top:16px">Arbitrage Windows</div>
+  <div class="grid grid-3" id="arbCards"></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- TAB 2: CRUDE OIL MARKETS                               -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="tab-content" id="tab-crude">
+  <div class="grid grid-2-1">
+    <div>
+      <div class="section-title">Benchmark Prices</div>
+      <div class="card"><table class="data-table" id="crudeBenchmarks"></table></div>
+      <div class="section-title">Key Differentials</div>
+      <div class="card"><table class="data-table" id="crudeDiffs"></table></div>
+    </div>
+    <div>
+      <div class="section-title">OPEC+ Context</div>
+      <div class="card" id="opecCard"></div>
+      <div class="section-title" style="margin-top:12px">Procurement Signals</div>
+      <div class="card" id="procureCard"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- TAB 3: FUEL PRODUCTS                                   -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="tab-content" id="tab-products">
+  <div class="section-title">Gasoline / Motor Spirit</div>
+  <div class="card"><table class="data-table" id="tblGasoline"></table></div>
+  <div class="section-title">Diesel / Gasoil</div>
+  <div class="card"><table class="data-table" id="tblDiesel"></table></div>
+  <div class="section-title">Jet Fuel / ATF</div>
+  <div class="card"><table class="data-table" id="tblJet"></table></div>
+  <div class="section-title">Fuel Oil</div>
+  <div class="card"><table class="data-table" id="tblFuelOil"></table></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- TAB 4: PETROCHEMICALS                                  -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="tab-content" id="tab-petchem">
+  <div class="grid grid-2">
+    <div>
+      <div class="section-title">Naphtha</div>
+      <div class="card"><table class="data-table" id="tblNaphtha"></table></div>
+      <div class="section-title">Olefins</div>
+      <div class="card"><table class="data-table" id="tblOlefins"></table></div>
+    </div>
+    <div>
+      <div class="section-title">Aromatics</div>
+      <div class="card"><table class="data-table" id="tblAromatics"></table></div>
+      <div class="section-title">Cracker Economics</div>
+      <div class="card" id="crackerEcon"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- TAB 5: CRACKS & MARGINS                                -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="tab-content" id="tab-cracks">
+  <div class="grid grid-2">
+    <div>
+      <div class="section-title">Product Crack Spreads vs Dubai</div>
+      <div class="card"><table class="data-table" id="tblCracks"></table></div>
+      <div class="section-title">Complex GRM Proxy</div>
+      <div class="card" id="grmCard"></div>
+    </div>
+    <div>
+      <div class="section-title">What-If: Crude Cost Sensitivity</div>
+      <div class="card" id="whatIfCard"></div>
+      <div class="section-title">Regional Margin Comparison</div>
+      <div class="card"><table class="data-table" id="tblRegionalMargins"></table></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- TAB 6: FX & MACRO                                      -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="tab-content" id="tab-fx">
+  <div class="grid grid-2">
+    <div>
+      <div class="section-title">Currency Rates</div>
+      <div class="card"><table class="data-table" id="tblFx"></table></div>
+      <div class="section-title">FX Impact on GRM</div>
+      <div class="card" id="fxImpactCard"></div>
+    </div>
+    <div>
+      <div class="section-title">Macro Indicators</div>
+      <div class="card"><table class="data-table" id="tblMacro"></table></div>
+      <div class="section-title">Rate Environment</div>
+      <div class="card"><table class="data-table" id="tblRates"></table></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- TAB 7: LOGISTICS & FREIGHT                             -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="tab-content" id="tab-logistics">
+  <div class="grid grid-2">
+    <div>
+      <div class="section-title">Tanker Rates by Vessel Class</div>
+      <div class="card"><table class="data-table" id="tblFreight"></table></div>
+      <div class="section-title">Key Route Costs</div>
+      <div class="card"><table class="data-table" id="tblRoutes"></table></div>
+    </div>
+    <div>
+      <div class="section-title">Freight Scenario Calculator</div>
+      <div class="card" id="freightCalcCard"></div>
+      <div class="section-title">Port & Canal Indicators</div>
+      <div class="card" id="portCard"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- TAB 8: NEWS & ALERTS                                   -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="tab-content" id="tab-news">
+  <div class="grid grid-2">
+    <div>
+      <div class="section-title">Market-Moving Headlines</div>
+      <div class="card scroll-card" id="newsFeed" style="padding:0"></div>
+    </div>
+    <div>
+      <div class="section-title">Event Impact Tracker</div>
+      <div class="card scroll-card" id="eventTracker" style="padding:0"></div>
+      <div class="section-title" style="margin-top:12px">Category Filter</div>
+      <div id="newsFilters" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- TAB 9: ARCHITECTURE & DATA                             -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="tab-content" id="tab-architecture">
+  <div class="grid grid-2">
+    <div>
+      <div class="section-title">Data Sources & Status</div>
+      <div class="card scroll-card" id="archSources" style="padding:0"></div>
+      <div class="section-title">Refresh Log</div>
+      <div class="card scroll-card" id="refreshLog" style="padding:0;max-height:220px"></div>
+    </div>
+    <div>
+      <div class="section-title">Assumptions & Methodology</div>
+      <div class="card scroll-card" id="assumptions" style="padding:12px"></div>
+      <div class="section-title">System Architecture</div>
+      <div class="card" id="archDiagram" style="padding:14px"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ FOOTER ═══════ -->
+<div class="footer">
+  <span>RefineryDesk v1.0 — Built for integrated refinery trading desks</span>
+  <span id="lastRefresh">Last data refresh: --</span>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- JAVASCRIPT ENGINE                                          -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<script>
+// ──────────────────────────────────────────────
+// SECTION 1: REFERENCE DATA MODEL
+// All prices are reference values seeded from recent market actuals.
+// In production, these would be replaced by live API feeds.
+// ──────────────────────────────────────────────
+const REF = {
+  crude: {
+    brent:       { price: 74.85, unit: '$/bbl', source: 'ICE Futures', region: 'Global' },
+    wti:         { price: 70.23, unit: '$/bbl', source: 'NYMEX', region: 'US' },
+    dubai:       { price: 73.10, unit: '$/bbl', source: 'Platts/DME', region: 'Asia' },
+    oman:        { price: 73.45, unit: '$/bbl', source: 'DME', region: 'ME' },
+    murban:      { price: 74.20, unit: '$/bbl', source: 'IFAD', region: 'UAE' },
+    basrahLight: { price: 71.80, unit: '$/bbl', source: 'Iraq SOMO', region: 'Iraq' },
+    arabLight:   { price: 73.60, unit: '$/bbl', source: 'Aramco OSP', region: 'KSA' },
+    upperZakum: { price: 73.90, unit: '$/bbl', source: 'ADNOC', region: 'UAE' },
+    espo:        { price: 72.50, unit: '$/bbl', source: 'Platts', region: 'Russia' },
+  },
+  products: {
+    gasolineMOPS:  { price: 86.40, unit: '$/bbl', region: 'Singapore' },
+    gasolineNWE:   { price: 88.10, unit: '$/bbl', region: 'NW Europe' },
+    gasolineUSGC:  { price: 84.20, unit: '$/bbl', region: 'US Gulf' },
+    dieselMOPS:    { price: 90.50, unit: '$/bbl', region: 'Singapore' },
+    dieselNWE:     { price: 92.30, unit: '$/bbl', region: 'NW Europe' },
+    dieselUSGC:    { price: 88.70, unit: '$/bbl', region: 'US Gulf' },
+    jetMOPS:       { price: 88.60, unit: '$/bbl', region: 'Singapore' },
+    jetNWE:        { price: 90.40, unit: '$/bbl', region: 'NW Europe' },
+    jetUSGC:       { price: 86.90, unit: '$/bbl', region: 'US Gulf' },
+    hsfo380:       { price: 58.40, unit: '$/bbl', region: 'Singapore' },
+    vlsfo:         { price: 76.20, unit: '$/bbl', region: 'Singapore' },
+    hsfoNWE:       { price: 56.80, unit: '$/bbl', region: 'NW Europe' },
+  },
+  petchem: {
+    naphthaJapan:  { price: 618, unit: '$/MT', region: 'Japan CFR' },
+    naphthaNWE:    { price: 605, unit: '$/MT', region: 'NWE CIF' },
+    naphthaMOPS:   { price: 612, unit: '$/MT', region: 'Singapore' },
+    ethyleneSEA:   { price: 910, unit: '$/MT', region: 'SE Asia CFR' },
+    ethyleneNEA:   { price: 935, unit: '$/MT', region: 'NE Asia CFR' },
+    propyleneSEA:  { price: 830, unit: '$/MT', region: 'SE Asia CFR' },
+    propyleneNEA:  { price: 855, unit: '$/MT', region: 'NE Asia CFR' },
+    benzeneFOB:    { price: 845, unit: '$/MT', region: 'Korea FOB' },
+    benzeneCFR:    { price: 870, unit: '$/MT', region: 'SE Asia CFR' },
+    toluene:       { price: 760, unit: '$/MT', region: 'SE Asia FOB' },
+    paraxylene:    { price: 920, unit: '$/MT', region: 'Asia CFR' },
+    mixedXylene:   { price: 780, unit: '$/MT', region: 'SE Asia FOB' },
+  },
+  fx: {
+    usdInr: { rate: 83.72, source: 'RBI Reference' },
+    eurUsd: { rate: 1.0890, source: 'ECB' },
+    gbpUsd: { rate: 1.2710, source: 'BoE' },
+    cnyUsd: { rate: 7.2450, source: 'PBoC' },
+    jpyUsd: { rate: 154.80, source: 'BoJ' },
+  },
+  freight: {
+    vlccAGEast:     { ws: 48,  flatRate: 9.80,  dollarPerBbl: 1.65, route: 'AG → East India' },
+    vlccAGWest:     { ws: 52,  flatRate: 10.20, dollarPerBbl: 1.72, route: 'AG → West India' },
+    suezmaxAGInd:   { ws: 92,  flatRate: 14.50, dollarPerBbl: 2.10, route: 'AG → India' },
+    aframaxAGInd:   { ws: 128, flatRate: 18.20, dollarPerBbl: 2.85, route: 'AG → India' },
+    mrAGInd:        { ws: 195, flatRate: 22.80, dollarPerBbl: 3.60, route: 'AG → India' },
+    vlccWAFInd:     { ws: 55,  flatRate: 18.50, dollarPerBbl: 3.10, route: 'WAF → India' },
+    suezmaxWAFInd:  { ws: 98,  flatRate: 22.00, dollarPerBbl: 3.45, route: 'WAF → India' },
+    mrSingInd:      { ws: 160, flatRate: 12.50, dollarPerBbl: 1.98, route: 'Singapore → India' },
+  },
+};
+
+// ──────────────────────────────────────────────
+// SECTION 2: LIVE STATE (simulated ticks)
+// ──────────────────────────────────────────────
+let STATE = {};
+let refreshLog = [];
+let fxLive = null;
+
+function initState() {
+  STATE = {};
+  function walk(obj, path='') {
+    for (const [k,v] of Object.entries(obj)) {
+      const p = path ? `${path}.${k}` : k;
+      if (v && typeof v === 'object' && !Array.isArray(v) && ('price' in v || 'rate' in v || 'ws' in v)) {
+        const base = v.price || v.rate || v.ws;
+        STATE[p] = { base, current: base, change: 0, pctChange: 0, history: Array(24).fill(base), unit: v.unit||'', source: v.source||'', region: v.region||'', route: v.route||'', flatRate: v.flatRate||0, dollarPerBbl: v.dollarPerBbl||0 };
+      } else if (v && typeof v === 'object') {
+        walk(v, p);
+      }
+    }
+  }
+  walk(REF);
+}
+
+function tick() {
+  for (const [k,s] of Object.entries(STATE)) {
+    const volatility = k.includes('petchem') ? 0.004 : k.includes('freight') ? 0.006 : k.includes('fx') ? 0.001 : 0.003;
+    const delta = s.base * volatility * (Math.random() - 0.5);
+    s.current = +(s.current + delta).toFixed(k.includes('fx') ? 4 : 2);
+    s.change = +(s.current - s.base).toFixed(k.includes('fx') ? 4 : 2);
+    s.pctChange = +((s.change / s.base) * 100).toFixed(2);
+    s.history.push(s.current);
+    if (s.history.length > 24) s.history.shift();
+  }
+}
+
+// ──────────────────────────────────────────────
+// SECTION 3: UTILITY FUNCTIONS
+// ──────────────────────────────────────────────
+function fmt(n, d=2) { return n == null ? '--' : Number(n).toFixed(d); }
+function fmtSgn(n, d=2) { return n == null ? '--' : (n>=0?'+':'') + Number(n).toFixed(d); }
+function cls(n) { return n > 0.005 ? 'up' : n < -0.005 ? 'down' : 'flat'; }
+function priceCell(val, chg, pct, digits=2) {
+  const c = cls(chg);
+  return `<span class="price-sm">${fmt(val,digits)}</span> <span class="price-change ${c}"><span class="arrow"></span>${fmtSgn(chg,digits)} (${fmtSgn(pct,2)}%)</span>`;
+}
+function sparkHTML(history) {
+  const mn = Math.min(...history), mx = Math.max(...history), range = mx - mn || 1;
+  return '<div class="sparkline-container">' + history.map((v,i) => {
+    const h = 4 + ((v - mn)/range)*26;
+    const c = i>0 ? (v >= history[i-1] ? 'up' : 'down') : 'up';
+    return `<div class="spark-bar ${c}" style="height:${h}px"></div>`;
+  }).join('') + '</div>';
+}
+function get(path) { return STATE[path]; }
+
+// ──────────────────────────────────────────────
+// SECTION 4: CLOCKS & MARKET STATUS
+// ──────────────────────────────────────────────
+function updateClocks() {
+  const now = new Date();
+  const opts = { hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false };
+  document.getElementById('istTime').textContent = now.toLocaleTimeString('en-GB', {...opts, timeZone:'Asia/Kolkata'});
+  document.getElementById('sgtTime').textContent = now.toLocaleTimeString('en-GB', {...opts, timeZone:'Asia/Singapore'});
+  document.getElementById('ldnTime').textContent = now.toLocaleTimeString('en-GB', {...opts, timeZone:'Europe/London'});
+  document.getElementById('nycTime').textContent = now.toLocaleTimeString('en-GB', {...opts, timeZone:'America/New_York'});
+}
+
+function updateMarketStatus() {
+  const now = new Date();
+  const markets = [
+    { name:'NYMEX', tz:'America/New_York', open:9, close:14.5 },
+    { name:'ICE', tz:'Europe/London', open:8, close:18 },
+    { name:'DME', tz:'Asia/Singapore', open:6.5, close:17.5 },
+    { name:'SGX', tz:'Asia/Singapore', open:8, close:18 },
+    { name:'MCX', tz:'Asia/Kolkata', open:9, close:23.5 },
+  ];
+  const el = document.getElementById('marketStatus');
+  el.innerHTML = markets.map(m => {
+    const h = parseFloat(now.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',hour12:false,timeZone:m.tz}).replace(':','.'));
+    const isOpen = h >= m.open && h < m.close && now.getDay()>0 && now.getDay()<6;
+    return `<span><span class="dot ${isOpen?'open':'closed'}"></span>${m.name}</span>`;
+  }).join('');
+}
+
+// ──────────────────────────────────────────────
+// SECTION 5: ALERT SYSTEM
+// ──────────────────────────────────────────────
+const ALERTS = [
+  { level:'urgent', text:'OPEC+ ministerial meeting outcome pending — production cut extension under discussion for Q3 2025' },
+  { level:'urgent', text:'Red Sea disruption: Houthi attacks escalate; Suez transit insurance premiums surge 150%' },
+  { level:'watch', text:'India monsoon forecast: IMD predicts above-normal rainfall — domestic diesel demand seasonally weak' },
+  { level:'watch', text:'US SPR release: DoE announces additional 20 MMbbl release over next 60 days' },
+  { level:'watch', text:'China Teapot refiners: Shandong independent utilization drops to 58% on weak margins' },
+  { level:'urgent', text:'Iran sanctions: EU announces new restrictions on Iranian crude exports effective Aug 1' },
+  { level:'watch', text:'Singapore MOPS window: Gasoline assessment firm; multiple buy-side bids in window' },
+  { level:'watch', text:'Indian OMC price revision: BPCL, HPCL expected to adjust MS/HSD prices within 48 hrs' },
+];
+let alertIdx = 0;
+function rotateAlert() {
+  const a = ALERTS[alertIdx % ALERTS.length];
+  const banner = document.getElementById('alertBanner');
+  banner.className = 'alert-banner' + (a.level==='watch'?' amber':'');
+  document.getElementById('alertTag').className = 'tag ' + (a.level==='urgent'?'urgent':'watch');
+  document.getElementById('alertTag').textContent = a.level.toUpperCase();
+  document.getElementById('alertTicker').textContent = a.text + '     ●     ' + a.text;
+  alertIdx++;
+}
+
+// ──────────────────────────────────────────────
+// SECTION 6: TAB MANAGEMENT
+// ──────────────────────────────────────────────
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+  });
+});
+
+// ──────────────────────────────────────────────
+// SECTION 7: RENDER FUNCTIONS
+// ──────────────────────────────────────────────
+
+// ── 7a: COMMAND CENTER ──
+function renderCommand() {
+  // KPI Strip
+  const dubai = get('crude.dubai'), brent = get('crude.brent'), wti = get('crude.wti');
+  const usdInr = get('fx.usdInr');
+  const gasMOPS = get('products.gasolineMOPS'), dslMOPS = get('products.dieselMOPS');
+  const grmVal = ((gasMOPS.current*0.35 + dslMOPS.current*0.40 + get('products.jetMOPS').current*0.10 + get('products.hsfo380').current*0.15) - dubai.current).toFixed(2);
+  
+  document.getElementById('kpiStrip').innerHTML = [
+    { label:'BRENT', value: fmt(brent.current), delta: fmtSgn(brent.change), c: cls(brent.change) },
+    { label:'DUBAI', value: fmt(dubai.current), delta: fmtSgn(dubai.change), c: cls(dubai.change) },
+    { label:'WTI', value: fmt(wti.current), delta: fmtSgn(wti.change), c: cls(wti.change) },
+    { label:'USD/INR', value: fmt(usdInr.current,2), delta: fmtSgn(usdInr.change,4), c: cls(usdInr.change) },
+    { label:'SINGAPORE GRM', value: '$'+grmVal, delta: '', c: parseFloat(grmVal)>0?'up':'down' },
+    { label:'MS CRACK', value: fmt(gasMOPS.current - dubai.current), delta: '', c: cls(gasMOPS.current-dubai.current) },
+    { label:'HSD CRACK', value: fmt(dslMOPS.current - dubai.current), delta: '', c: cls(dslMOPS.current-dubai.current) },
+  ].map(k => `<div class="kpi-item"><div class="kpi-label">${k.label}</div><div class="kpi-value ${k.c}">${k.value}</div><div class="kpi-delta ${k.c}">${k.delta}</div></div>`).join('');
+
+  // Benchmark cards
+  const benchmarks = [
+    { key:'crude.brent', label:'Brent Crude', sub:'ICE Futures Europe' },
+    { key:'crude.dubai', label:'Dubai Crude', sub:'Platts / DME' },
+    { key:'crude.wti', label:'WTI Crude', sub:'NYMEX' },
+    { key:'crude.murban', label:'Murban', sub:'ICE Futures Abu Dhabi' },
+  ];
+  document.getElementById('commandCards').innerHTML = benchmarks.map(b => {
+    const s = get(b.key);
+    return `<div class="card"><div class="card-header"><div class="card-title">${b.label}</div><div class="card-badge">${b.sub}</div></div><div class="price-big ${cls(s.change)}">${fmt(s.current)}</div><div class="price-change ${cls(s.change)}"><span class="arrow"></span>${fmtSgn(s.change)} (${fmtSgn(s.pctChange)}%)</div>${sparkHTML(s.history)}</div>`;
+  }).join('');
+
+  // Crack cards
+  const cracks = [
+    { label:'Gasoline/MS', prod:'products.gasolineMOPS' },
+    { label:'Diesel/HSD', prod:'products.dieselMOPS' },
+    { label:'Jet/ATF', prod:'products.jetMOPS' },
+    { label:'Fuel Oil (HSFO)', prod:'products.hsfo380' },
+  ];
+  document.getElementById('crackCards').innerHTML = cracks.map(cr => {
+    const p = get(cr.prod), d = get('crude.dubai');
+    const crack = (p.current - d.current);
+    return `<div class="card"><div class="card-header"><div class="card-title">${cr.label} Crack</div><div class="card-badge">vs Dubai</div></div><div class="price-big ${cls(crack)}">${fmtSgn(crack)}</div><div style="font-size:10px;color:var(--text-muted);margin-top:4px">Product: $${fmt(p.current)} — Crude: $${fmt(d.current)}</div></div>`;
+  }).join('');
+
+  // Arbitrage cards
+  const arbs = [
+    { label:'Gasoline East→West', buy: get('products.gasolineMOPS').current, sell: get('products.gasolineNWE').current, freight: 3.20 },
+    { label:'Diesel MOPS→India', buy: get('products.dieselMOPS').current, sell: get('products.dieselMOPS').current + 1.80, freight: 1.50 },
+    { label:'Naphtha MOPS→Japan', buy: get('petchem.naphthaMOPS').current / 8.33, sell: get('petchem.naphthaJapan').current / 8.33, freight: 1.80 },
+  ];
+  document.getElementById('arbCards').innerHTML = arbs.map(a => {
+    const margin = a.sell - a.buy - a.freight;
+    return `<div class="card"><div class="card-header"><div class="card-title">${a.label}</div><div class="card-badge">${margin>0?'OPEN':'CLOSED'}</div></div><div class="price-med ${cls(margin)}">${fmtSgn(margin)} $/bbl</div><div style="font-size:10px;color:var(--text-muted);margin-top:6px">Buy: $${fmt(a.buy)} · Sell: $${fmt(a.sell)} · Freight: $${fmt(a.freight)}</div></div>`;
+  }).join('');
+}
+
+// ── 7b: CRUDE OIL MARKETS ──
+function renderCrude() {
+  const grades = [
+    ['Brent','crude.brent'],['WTI','crude.wti'],['Dubai','crude.dubai'],['Oman','crude.oman'],
+    ['Murban','crude.murban'],['Basrah Light','crude.basrahLight'],['Arab Light','crude.arabLight'],
+    ['Upper Zakum','crude.upperZakum'],['ESPO','crude.espo'],
+  ];
+  document.getElementById('crudeBenchmarks').innerHTML = `<thead><tr><th>Grade</th><th>Price ($/bbl)</th><th>Change</th><th>Region</th><th>Trend (24 ticks)</th></tr></thead><tbody>${grades.map(([name,key]) => {
+    const s = get(key);
+    return `<tr><td class="label-cell">${name}</td><td>${fmt(s.current)}</td><td class="${cls(s.change)}">${fmtSgn(s.change)} (${fmtSgn(s.pctChange)}%)</td><td class="sub">${s.region}</td><td>${sparkHTML(s.history)}</td></tr>`;
+  }).join('')}</tbody>`;
+
+  // Differentials
+  const diffs = [
+    ['Brent – Dubai', get('crude.brent').current - get('crude.dubai').current],
+    ['WTI – Brent', get('crude.wti').current - get('crude.brent').current],
+    ['Oman – Dubai', get('crude.oman').current - get('crude.dubai').current],
+    ['Murban – Dubai', get('crude.murban').current - get('crude.dubai').current],
+    ['ESPO – Dubai', get('crude.espo').current - get('crude.dubai').current],
+    ['Brent – WTI', get('crude.brent').current - get('crude.wti').current],
+  ];
+  document.getElementById('crudeDiffs').innerHTML = `<thead><tr><th>Differential</th><th>Value ($/bbl)</th><th>Signal</th></tr></thead><tbody>${diffs.map(([name,val]) => {
+    const signal = Math.abs(val) < 1 ? 'Converging' : val > 2 ? 'Wide premium' : val < -2 ? 'Deep discount' : val > 0 ? 'Premium' : 'Discount';
+    return `<tr><td class="label-cell">${name}</td><td class="${cls(val)}">${fmtSgn(val,2)}</td><td class="sub">${signal}</td></tr>`;
+  }).join('')}</tbody>`;
+
+  // OPEC+ Context
+  document.getElementById('opecCard').innerHTML = `
+    <div style="font-size:11px;line-height:1.7;color:var(--text-secondary)">
+      <div style="margin-bottom:8px"><strong style="color:var(--text-primary)">Production Quota:</strong> 36.2 MMbpd (OPEC+)</div>
+      <div style="margin-bottom:8px"><strong style="color:var(--text-primary)">Compliance:</strong> ~116% (over-compliance by KSA, UAE)</div>
+      <div style="margin-bottom:8px"><strong style="color:var(--text-primary)">Voluntary Cuts:</strong> 2.2 MMbpd extended through Q3 2025</div>
+      <div style="margin-bottom:8px"><strong style="color:var(--text-primary)">Next Meeting:</strong> July 2025 (full ministerial)</div>
+      <div><strong style="color:var(--text-primary)">Key Risk:</strong> UAE pushing for higher baseline; Libya output volatile</div>
+    </div>`;
+
+  // Procurement Signals
+  const dubaiP = get('crude.dubai').current;
+  const brentP = get('crude.brent').current;
+  const brentDubaiSpread = brentP - dubaiP;
+  document.getElementById('procureCard').innerHTML = `
+    <div style="font-size:11px;line-height:1.7;color:var(--text-secondary)">
+      <div style="margin-bottom:8px"><strong style="color:var(--text-primary)">Brent-Dubai Spread:</strong> <span class="${cls(brentDubaiSpread)}">${fmtSgn(brentDubaiSpread)}</span> — ${brentDubaiSpread > 2 ? 'Favors sour/medium crude procurement' : 'Neutral spread'}</div>
+      <div style="margin-bottom:8px"><strong style="color:var(--text-primary)">Aramco OSP (Aug):</strong> Arab Light OSP Asia at +$1.50/bbl vs Oman/Dubai avg</div>
+      <div style="margin-bottom:8px"><strong style="color:var(--text-primary)">Spot Market:</strong> Al-Shaheen, Murban cargoes offered; Upper Zakum tight</div>
+      <div><strong style="color:var(--text-primary)">Recommendation:</strong> ${brentDubaiSpread > 1.5 ? 'Consider increasing AG sour crude intake vs dated Brent-linked WAF grades' : 'WAF and AG grades at comparable delivered cost'}</div>
+    </div>`;
+}
+
+// ── 7c: FUEL PRODUCTS ──
+function renderProducts() {
+  function prodTable(id, rows) {
+    document.getElementById(id).innerHTML = `<thead><tr><th>Benchmark</th><th>Region</th><th>Price ($/bbl)</th><th>Change</th><th>Crack vs Dubai</th><th>Trend</th></tr></thead><tbody>${rows.map(([name,key,region]) => {
+      const s = get(key), d = get('crude.dubai'), crack = s.current - d.current;
+      return `<tr><td class="label-cell">${name}</td><td class="sub">${region}</td><td>${fmt(s.current)}</td><td class="${cls(s.change)}">${fmtSgn(s.change)}</td><td class="${cls(crack)}">${fmtSgn(crack)}</td><td>${sparkHTML(s.history)}</td></tr>`;
+    }).join('')}</tbody>`;
+  }
+  prodTable('tblGasoline', [
+    ['MOPS 92 RON','products.gasolineMOPS','Singapore'],
+    ['NWE Barges','products.gasolineNWE','NW Europe'],
+    ['USGC Pipeline','products.gasolineUSGC','US Gulf Coast'],
+  ]);
+  prodTable('tblDiesel', [
+    ['MOPS 10ppm Gasoil','products.dieselMOPS','Singapore'],
+    ['NWE ICE Gasoil','products.dieselNWE','NW Europe'],
+    ['USGC ULSD','products.dieselUSGC','US Gulf Coast'],
+  ]);
+  prodTable('tblJet', [
+    ['MOPS Jet/Kero','products.jetMOPS','Singapore'],
+    ['NWE CIF Jet','products.jetNWE','NW Europe'],
+    ['USGC Jet 54','products.jetUSGC','US Gulf Coast'],
+  ]);
+  prodTable('tblFuelOil', [
+    ['HSFO 380cst','products.hsfo380','Singapore'],
+    ['VLSFO 0.5%S','products.vlsfo','Singapore'],
+    ['NWE HSFO 3.5%','products.hsfoNWE','NW Europe'],
+  ]);
+}
+
+// ── 7d: PETROCHEMICALS ──
+function renderPetchem() {
+  function petTable(id, rows) {
+    document.getElementById(id).innerHTML = `<thead><tr><th>Product</th><th>Region</th><th>Price ($/MT)</th><th>Change</th><th>Trend</th></tr></thead><tbody>${rows.map(([name,key,region]) => {
+      const s = get(key);
+      return `<tr><td class="label-cell">${name}</td><td class="sub">${region}</td><td>${fmt(s.current,0)}</td><td class="${cls(s.change)}">${fmtSgn(s.change,0)}</td><td>${sparkHTML(s.history)}</td></tr>`;
+    }).join('')}</tbody>`;
+  }
+  petTable('tblNaphtha', [
+    ['Naphtha CFR Japan','petchem.naphthaJapan','Japan'],
+    ['Naphtha CIF NWE','petchem.naphthaNWE','NW Europe'],
+    ['Naphtha MOPS','petchem.naphthaMOPS','Singapore'],
+  ]);
+  petTable('tblOlefins', [
+    ['Ethylene CFR SEA','petchem.ethyleneSEA','SE Asia'],
+    ['Ethylene CFR NEA','petchem.ethyleneNEA','NE Asia'],
+    ['Propylene CFR SEA','petchem.propyleneSEA','SE Asia'],
+    ['Propylene CFR NEA','petchem.propyleneNEA','NE Asia'],
+  ]);
+  petTable('tblAromatics', [
+    ['Benzene FOB Korea','petchem.benzeneFOB','Korea'],
+    ['Benzene CFR SEA','petchem.benzeneCFR','SE Asia'],
+    ['Toluene FOB SEA','petchem.toluene','SE Asia'],
+    ['Paraxylene CFR Asia','petchem.paraxylene','Asia'],
+    ['Mixed Xylenes FOB','petchem.mixedXylene','SE Asia'],
+  ]);
+
+  // Cracker Economics
+  const naph = get('petchem.naphthaMOPS').current;
+  const eth = get('petchem.ethyleneSEA').current;
+  const prop = get('petchem.propyleneSEA').current;
+  const benz = get('petchem.benzeneFOB').current;
+  // Naphtha cracker: ~0.30 MT eth + 0.16 MT prop + 0.07 MT benzene per MT naphtha feed
+  const crackerRevenue = 0.30*eth + 0.16*prop + 0.07*benz;
+  const crackerMargin = crackerRevenue - naph;
+  // Naphtha as fuel ($/bbl) vs as feed ($/MT)
+  const naphBbl = naph / 8.33;
+  const dubaiP = get('crude.dubai').current;
+  const naphthaFuelCrack = naphBbl - dubaiP;
+
+  document.getElementById('crackerEcon').innerHTML = `
+    <div style="font-size:11px;line-height:1.8;color:var(--text-secondary)">
+      <div><strong style="color:var(--text-primary)">Naphtha Feed Cost:</strong> $${fmt(naph,0)}/MT ($${fmt(naphBbl)}/bbl)</div>
+      <div><strong style="color:var(--text-primary)">Cracker Revenue (per MT feed):</strong> $${fmt(crackerRevenue,0)}/MT</div>
+      <div><strong style="color:var(--text-primary)">Naphtha Cracker Margin:</strong> <span class="${cls(crackerMargin)}" style="font-family:var(--mono);font-weight:600">${fmtSgn(crackerMargin,0)} $/MT</span></div>
+      <div style="border-top:1px solid var(--border);margin:8px 0;padding-top:8px"><strong style="color:var(--text-primary)">Naphtha as Fuel (Crack vs Dubai):</strong> <span class="${cls(naphthaFuelCrack)}">${fmtSgn(naphthaFuelCrack)} $/bbl</span></div>
+      <div><strong style="color:var(--text-primary)">Feed vs Fuel Signal:</strong> ${crackerMargin > 50 ? 'Strong feed value — divert to petchem' : crackerMargin > 0 ? 'Marginal feed economics — monitor' : 'Fuel value dominates — sell as motor gasoline blendstock'}</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted)">Yields assumed: 30% ethylene, 16% propylene, 7% benzene (liquid naphtha cracker)</div>
+    </div>`;
+}
+
+// ── 7e: CRACKS & MARGINS ──
+function renderCracks() {
+  const d = get('crude.dubai').current;
+  const prods = [
+    ['Gasoline MOPS','products.gasolineMOPS',0.35],
+    ['Diesel MOPS','products.dieselMOPS',0.40],
+    ['Jet/ATF MOPS','products.jetMOPS',0.10],
+    ['HSFO 380','products.hsfo380',0.08],
+    ['VLSFO','products.vlsfo',0.07],
+    ['Naphtha (as $/bbl)','petchem.naphthaMOPS',0.00],
+  ];
+  document.getElementById('tblCracks').innerHTML = `<thead><tr><th>Product</th><th>Price $/bbl</th><th>Crack vs Dubai</th><th>GRM Weight</th></tr></thead><tbody>${prods.map(([name,key,wt]) => {
+    let p = get(key).current;
+    if (key.includes('petchem')) p = p / 8.33;
+    const crack = p - d;
+    return `<tr><td class="label-cell">${name}</td><td>${fmt(p)}</td><td class="${cls(crack)}">${fmtSgn(crack)}</td><td class="sub">${wt>0?(wt*100).toFixed(0)+'%':'Ref'}</td></tr>`;
+  }).join('')}</tbody>`;
+
+  // GRM Card
+  const gas=get('products.gasolineMOPS').current, dsl=get('products.dieselMOPS').current;
+  const jet=get('products.jetMOPS').current, hsfo=get('products.hsfo380').current, vlsfo=get('products.vlsfo').current;
+  const weightedProduct = gas*0.35 + dsl*0.40 + jet*0.10 + hsfo*0.08 + vlsfo*0.07;
+  const grm = weightedProduct - d;
+  document.getElementById('grmCard').innerHTML = `
+    <div style="text-align:center;padding:10px 0">
+      <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px">Singapore Complex GRM Proxy</div>
+      <div class="price-big ${cls(grm)}" style="font-size:36px;margin:8px 0">$${fmt(grm)}</div>
+      <div style="font-size:10px;color:var(--text-muted)">per barrel of Dubai crude processed</div>
+      <div style="margin-top:10px;font-size:11px;color:var(--text-secondary)">Weighted product basket: $${fmt(weightedProduct)} — Crude: $${fmt(d)}</div>
+      <div style="margin-top:4px;font-size:10px;color:var(--text-muted)">Yield split: 35% MS, 40% HSD, 10% ATF, 8% HSFO, 7% VLSFO</div>
+    </div>`;
+
+  // What-If
+  document.getElementById('whatIfCard').innerHTML = `
+    <div>
+      <div class="slider-group">
+        <div class="slider-label"><span>Crude Cost Adjustment</span><span id="whatIfValue">$0.00</span></div>
+        <input type="range" id="whatIfSlider" min="-8" max="8" step="0.25" value="0" oninput="updateWhatIf()">
+      </div>
+      <div id="whatIfResults" style="font-size:11px;color:var(--text-secondary);line-height:1.8"></div>
+    </div>`;
+  updateWhatIf();
+
+  // Regional margins
+  const regionalData = [
+    ['Singapore Complex', grm, 'Benchmark'],
+    ['NWE Complex', (get('products.gasolineNWE').current*0.30+get('products.dieselNWE').current*0.45+get('products.jetNWE').current*0.10+get('products.hsfoNWE').current*0.15) - get('crude.brent').current, 'vs Brent'],
+    ['USGC Coking', (get('products.gasolineUSGC').current*0.40+get('products.dieselUSGC').current*0.35+get('products.jetUSGC').current*0.15+get('products.hsfo380').current*0.10) - get('crude.wti').current, 'vs WTI'],
+  ];
+  document.getElementById('tblRegionalMargins').innerHTML = `<thead><tr><th>Region</th><th>GRM Proxy</th><th>Basis</th></tr></thead><tbody>${regionalData.map(([name,val,basis]) => 
+    `<tr><td class="label-cell">${name}</td><td class="${cls(val)}" style="font-weight:600">$${fmt(val)}</td><td class="sub">${basis}</td></tr>`
+  ).join('')}</tbody>`;
+}
+
+function updateWhatIf() {
+  const adj = parseFloat(document.getElementById('whatIfSlider').value);
+  document.getElementById('whatIfValue').textContent = fmtSgn(adj) + ' $/bbl';
+  const d = get('crude.dubai').current + adj;
+  const gas=get('products.gasolineMOPS').current, dsl=get('products.dieselMOPS').current;
+  const jet=get('products.jetMOPS').current, hsfo=get('products.hsfo380').current, vlsfo=get('products.vlsfo').current;
+  const wp = gas*0.35 + dsl*0.40 + jet*0.10 + hsfo*0.08 + vlsfo*0.07;
+  const grm = wp - d;
+  const baseGrm = wp - get('crude.dubai').current;
+  const delta = grm - baseGrm;
+  document.getElementById('whatIfResults').innerHTML = `
+    <div><strong style="color:var(--text-primary)">Adjusted Crude Cost:</strong> $${fmt(d)}/bbl</div>
+    <div><strong style="color:var(--text-primary)">Adjusted GRM:</strong> <span class="${cls(grm)}" style="font-family:var(--mono);font-weight:600">$${fmt(grm)}/bbl</span></div>
+    <div><strong style="color:var(--text-primary)">GRM Impact:</strong> <span class="${cls(delta)}">${fmtSgn(delta)}</span> vs current</div>
+    <div style="margin-top:8px"><strong style="color:var(--text-primary)">INR Impact:</strong> At ₹${fmt(get('fx.usdInr').current)}/$ → ₹${fmt(grm * get('fx.usdInr').current * 7.33,0)}/MT GRM</div>
+    <div style="margin-top:6px;font-size:10px;color:var(--text-muted)">Sensitivity: $1/bbl crude cost change ≈ $1/bbl GRM change (product prices held constant)</div>`;
+}
+
+// ── 7f: FX & MACRO ──
+function renderFx() {
+  const fxPairs = [
+    ['USD / INR','fx.usdInr',2],['EUR / USD','fx.eurUsd',4],['GBP / USD','fx.gbpUsd',4],
+    ['CNY / USD','fx.cnyUsd',4],['JPY / USD','fx.jpyUsd',2],
+  ];
+  document.getElementById('tblFx').innerHTML = `<thead><tr><th>Pair</th><th>Rate</th><th>Change</th><th>Source</th><th>Trend</th></tr></thead><tbody>${fxPairs.map(([name,key,dig]) => {
+    const s = get(key);
+    return `<tr><td class="label-cell">${name}</td><td>${fmt(s.current,dig)}</td><td class="${cls(s.change)}">${fmtSgn(s.change,dig)}</td><td class="sub">${s.source||'Market'}</td><td>${sparkHTML(s.history)}</td></tr>`;
+  }).join('')}</tbody>`;
+
+  // FX Impact on GRM
+  const usdInr = get('fx.usdInr').current;
+  const baseInr = 83.72;
+  const grmUsd = 12.50; // approx
+  const grmInrBase = grmUsd * baseInr * 7.33; // $/bbl to ₹/MT
+  const grmInrCurrent = grmUsd * usdInr * 7.33;
+  const fxImpact = grmInrCurrent - grmInrBase;
+  document.getElementById('fxImpactCard').innerHTML = `
+    <div style="font-size:11px;line-height:1.8;color:var(--text-secondary)">
+      <div><strong style="color:var(--text-primary)">USD/INR Reference:</strong> ₹${fmt(baseInr)}</div>
+      <div><strong style="color:var(--text-primary)">USD/INR Current:</strong> ₹${fmt(usdInr)}</div>
+      <div><strong style="color:var(--text-primary)">GRM (USD):</strong> ~$${fmt(grmUsd)}/bbl (approx)</div>
+      <div><strong style="color:var(--text-primary)">GRM (INR) at reference FX:</strong> ₹${fmt(grmInrBase,0)}/MT</div>
+      <div><strong style="color:var(--text-primary)">GRM (INR) at current FX:</strong> <span class="${cls(fxImpact)}" style="font-family:var(--mono)">₹${fmt(grmInrCurrent,0)}/MT</span></div>
+      <div><strong style="color:var(--text-primary)">FX Impact:</strong> <span class="${cls(fxImpact)}">${fxImpact>0?'+':''}₹${fmt(fxImpact,0)}/MT</span></div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted)">Rule of thumb: ₹1 move in USD/INR ≈ ₹90/MT impact on INR GRM (at ~$12/bbl GRM)</div>
+    </div>`;
+
+  // Macro indicators
+  const macroData = [
+    ['India GDP Growth (FY25E)', '6.8%', 'RBI', 'Supportive'],
+    ['India Manufacturing PMI', '58.3', 'S&P Global', 'Expansionary'],
+    ['US Manufacturing PMI', '49.2', 'ISM', 'Contractionary'],
+    ['China Caixin PMI', '51.1', 'Caixin/S&P', 'Neutral'],
+    ['India CPI Inflation', '4.75%', 'MOSPI', 'Within target'],
+    ['Brent Implied Volatility', '28.5%', 'ICE', 'Moderate'],
+  ];
+  document.getElementById('tblMacro').innerHTML = `<thead><tr><th>Indicator</th><th>Value</th><th>Source</th><th>Signal</th></tr></thead><tbody>${macroData.map(([name,val,src,sig]) =>
+    `<tr><td class="label-cell">${name}</td><td style="font-family:var(--mono)">${val}</td><td class="sub">${src}</td><td class="sub">${sig}</td></tr>`
+  ).join('')}</tbody>`;
+
+  // Rate environment
+  const rateData = [
+    ['RBI Repo Rate', '6.50%', 'Unchanged since Feb 2024'],
+    ['US Fed Funds', '5.25-5.50%', 'Hold; cuts expected H2 2025'],
+    ['ECB Main Refi', '4.25%', 'Cut cycle started Jun 2024'],
+    ['10Y India G-Sec', '7.05%', 'Stable'],
+    ['10Y US Treasury', '4.28%', 'Elevated'],
+  ];
+  document.getElementById('tblRates').innerHTML = `<thead><tr><th>Rate</th><th>Level</th><th>Context</th></tr></thead><tbody>${rateData.map(([name,val,ctx]) =>
+    `<tr><td class="label-cell">${name}</td><td style="font-family:var(--mono)">${val}</td><td class="sub">${ctx}</td></tr>`
+  ).join('')}</tbody>`;
+}
+
+// ── 7g: LOGISTICS & FREIGHT ──
+function renderLogistics() {
+  const routes = [
+    ['VLCC AG→East India','freight.vlccAGEast'],['VLCC AG→West India','freight.vlccAGWest'],
+    ['Suezmax AG→India','freight.suezmaxAGInd'],['Aframax AG→India','freight.aframaxAGInd'],
+    ['MR AG→India','freight.mrAGInd'],['VLCC WAF→India','freight.vlccWAFInd'],
+    ['Suezmax WAF→India','freight.suezmaxWAFInd'],['MR Singapore→India','freight.mrSingInd'],
+  ];
+  document.getElementById('tblFreight').innerHTML = `<thead><tr><th>Route</th><th>Worldscale</th><th>$/MT (est)</th><th>$/bbl (est)</th><th>Trend</th></tr></thead><tbody>${routes.map(([name,key]) => {
+    const s = get(key);
+    return `<tr><td class="label-cell">${name}</td><td>WS ${fmt(s.current,0)}</td><td>${fmt(s.flatRate)}</td><td>${fmt(s.dollarPerBbl)}</td><td>${sparkHTML(s.history)}</td></tr>`;
+  }).join('')}</tbody>`;
+
+  // Key route costs
+  const routeCosts = [
+    ['AG → West India (VLCC)', 'Crude', '2M bbl', '8-10 days', get('freight.vlccAGWest').dollarPerBbl],
+    ['AG → East India (VLCC)', 'Crude', '2M bbl', '6-8 days', get('freight.vlccAGEast').dollarPerBbl],
+    ['WAF → India (Suezmax)', 'Crude', '1M bbl', '25-30 days', get('freight.suezmaxWAFInd').dollarPerBbl],
+    ['AG → India (MR)', 'Products', '40K MT', '5-7 days', get('freight.mrAGInd').dollarPerBbl],
+    ['Singapore → India (MR)', 'Products/Naphtha', '40K MT', '7-10 days', get('freight.mrSingInd').dollarPerBbl],
+  ];
+  document.getElementById('tblRoutes').innerHTML = `<thead><tr><th>Route</th><th>Cargo</th><th>Parcel</th><th>Voyage</th><th>Cost $/bbl</th></tr></thead><tbody>${routeCosts.map(([route,cargo,parcel,voyage,cost]) =>
+    `<tr><td class="label-cell">${route}</td><td class="sub">${cargo}</td><td class="sub">${parcel}</td><td class="sub">${voyage}</td><td style="font-weight:600">${fmt(cost)}</td></tr>`
+  ).join('')}</tbody>`;
+
+  // Freight Calculator
+  document.getElementById('freightCalcCard').innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+      <div><div style="font-size:10px;color:var(--text-muted);margin-bottom:4px">Vessel Class</div>
+        <select class="desk-select" id="calcVessel" style="width:100%">
+          <option value="vlcc">VLCC (2M bbl)</option><option value="suezmax">Suezmax (1M bbl)</option>
+          <option value="aframax">Aframax (600K bbl)</option><option value="mr">MR (350K bbl)</option>
+        </select></div>
+      <div><div style="font-size:10px;color:var(--text-muted);margin-bottom:4px">Route</div>
+        <select class="desk-select" id="calcRoute" style="width:100%">
+          <option value="ag-ind">AG → India</option><option value="waf-ind">WAF → India</option>
+          <option value="ag-sing">AG → Singapore</option><option value="sing-ind">Singapore → India</option>
+        </select></div>
+      <div><div style="font-size:10px;color:var(--text-muted);margin-bottom:4px">Worldscale Rate</div>
+        <input class="desk-input" id="calcWS" type="number" value="90" style="width:100%"></div>
+      <div><div style="font-size:10px;color:var(--text-muted);margin-bottom:4px">Cargo Size (MT)</div>
+        <input class="desk-input" id="calcCargo" type="number" value="270000" style="width:100%"></div>
+    </div>
+    <button class="desk-btn" onclick="calcFreight()" style="width:100%;margin-bottom:10px">Calculate</button>
+    <div id="calcResults" style="font-size:11px;color:var(--text-secondary);line-height:1.7"></div>`;
+  calcFreight();
+
+  // Port indicators
+  document.getElementById('portCard').innerHTML = `
+    <div style="font-size:11px;line-height:1.8;color:var(--text-secondary)">
+      <div style="display:flex;justify-content:space-between"><span><strong style="color:var(--text-primary)">Suez Canal:</strong></span><span style="color:var(--amber)">Elevated Risk ⚠</span></div>
+      <div style="display:flex;justify-content:space-between"><span><strong style="color:var(--text-primary)">Strait of Hormuz:</strong></span><span style="color:var(--green)">Normal</span></div>
+      <div style="display:flex;justify-content:space-between"><span><strong style="color:var(--text-primary)">Malacca Strait:</strong></span><span style="color:var(--green)">Normal</span></div>
+      <div style="display:flex;justify-content:space-between"><span><strong style="color:var(--text-primary)">Jamnagar SBM:</strong></span><span style="color:var(--green)">2 day wait</span></div>
+      <div style="display:flex;justify-content:space-between"><span><strong style="color:var(--text-primary)">Vadinar:</strong></span><span style="color:var(--green)">1 day wait</span></div>
+      <div style="display:flex;justify-content:space-between"><span><strong style="color:var(--text-primary)">Sikka (RIL):</strong></span><span style="color:var(--amber)">3 day wait ⚠</span></div>
+      <div style="display:flex;justify-content:space-between"><span><strong style="color:var(--text-primary)">Mangalore:</strong></span><span style="color:var(--green)">Normal</span></div>
+      <div style="margin-top:8px;font-size:10px;color:var(--text-muted)">Port wait times are indicative. Suez risk reflects Houthi disruption scenario.</div>
+    </div>`;
+}
+
+function calcFreight() {
+  const vessel = document.getElementById('calcVessel').value;
+  const route = document.getElementById('calcRoute').value;
+  const ws = parseFloat(document.getElementById('calcWS').value) || 90;
+  const cargo = parseFloat(document.getElementById('calcCargo').value) || 270000;
+  
+  // Flat rate references ($/MT at WS100)
+  const flatRates = {
+    'vlcc-ag-ind': 8.50, 'vlcc-waf-ind': 16.00, 'vlcc-ag-sing': 6.50, 'vlcc-sing-ind': 5.00,
+    'suezmax-ag-ind': 12.00, 'suezmax-waf-ind': 20.00, 'suezmax-ag-sing': 9.50, 'suezmax-sing-ind': 7.00,
+    'aframax-ag-ind': 16.00, 'aframax-waf-ind': 26.00, 'aframax-ag-sing': 12.50, 'aframax-sing-ind': 9.50,
+    'mr-ag-ind': 22.00, 'mr-waf-ind': 34.00, 'mr-ag-sing': 16.00, 'mr-sing-ind': 12.00,
+  };
+  const key = `${vessel}-${route}`;
+  const flatRate = flatRates[key] || 12.00;
+  const actualRate = flatRate * (ws / 100);
+  const totalCost = actualRate * cargo;
+  const costPerBbl = actualRate / 7.33;
+  
+  document.getElementById('calcResults').innerHTML = `
+    <div><strong style="color:var(--text-primary)">Flat Rate (WS 100):</strong> $${fmt(flatRate)}/MT</div>
+    <div><strong style="color:var(--text-primary)">Actual Rate (WS ${ws}):</strong> $${fmt(actualRate)}/MT</div>
+    <div><strong style="color:var(--text-primary)">Cost per Barrel:</strong> $${fmt(costPerBbl)}/bbl</div>
+    <div><strong style="color:var(--text-primary)">Total Freight Cost:</strong> $${(totalCost/1000000).toFixed(2)}M</div>
+    <div><strong style="color:var(--text-primary)">Cargo:</strong> ${(cargo/1000).toFixed(0)}K MT on ${vessel.toUpperCase()}</div>
+    <div style="margin-top:6px;font-size:10px;color:var(--text-muted)">Flat rates are reference estimates. Actual rates depend on market conditions, vessel availability, and voyage specifics.</div>`;
+}
+
+// ── 7h: NEWS & ALERTS ──
+function renderNews() {
+  const newsItems = [
+    { level:'critical', cat:'OPEC', headline:'OPEC+ extends 2.2 MMbpd voluntary cuts through Q3 2025; next review at July ministerial', time:'2h ago', impact:'Bullish crude — supports $70+ floor on Brent. Reduces spot availability of Arab Medium/Heavy grades.' },
+    { level:'critical', cat:'GEOPOLITICAL', headline:'Houthi drone strike damages Greek-flagged Aframax in southern Red Sea; crew evacuated', time:'4h ago', impact:'Freight surge on AG-West routes. Suez diversion adds 10-14 days and $2-3/bbl on WAF-to-India routes via Cape.' },
+    { level:'high', cat:'REFINERY', headline:'PetroChina Dalian 400K bpd refinery begins planned turnaround — 45-day maintenance window', time:'6h ago', impact:'Bearish crude demand from NEA. Bullish regional product cracks (gasoil, naphtha tightening).' },
+    { level:'high', cat:'POLICY', headline:'India cuts windfall tax on crude to zero; diesel export tax maintained at ₹1/litre', time:'8h ago', impact:'Positive for Indian E&P. Marginal negative for private refiner product export economics.' },
+    { level:'high', cat:'WEATHER', headline:'Hurricane season: Tropical Storm approaching USGC — Phillips 66 Sweeny, Motiva Port Arthur on watch', time:'10h ago', impact:'Bullish USGC gasoline and diesel. Could create transatlantic arb opportunities. Watch Colonial Pipeline nominations.' },
+    { level:'medium', cat:'PETCHEM', headline:'Asia naphtha crack recovers to 6-week high as steam crackers restart post-turnaround season', time:'12h ago', impact:'Naphtha demand strengthening. Supports naphtha-as-feed economics over fuel pooling.' },
+    { level:'medium', cat:'TRADE', headline:'India-Russia crude trade: ESPO blend discount narrows to $4/bbl below Brent from $8 in Q1', time:'14h ago', impact:'Reduced cost advantage of Russian grades. Indian refiners may shift marginal barrels back to AG sour.' },
+    { level:'low', cat:'MACRO', headline:'China PBoC holds LPR unchanged at 3.45%; industrial output growth slows to 5.0% YoY', time:'16h ago', impact:'Mildly bearish demand outlook. Supports range-bound pricing rather than breakout.' },
+    { level:'medium', cat:'FREIGHT', headline:'VLCC fleet utilization hits 92% — newbuild delivery schedule shows 18 vessels in H2 2025', time:'18h ago', impact:'Tight vessel supply supports elevated freight rates through summer. Long-haul routes most impacted.' },
+    { level:'low', cat:'STORAGE', headline:'Fujairah oil product stocks drop 8% WoW — middle distillate draws lead decline', time:'20h ago', impact:'Regional diesel/gasoil tightness. Supports MOPS gasoil assessment.' },
+    { level:'high', cat:'SANCTIONS', headline:'EU finalizes 14th sanctions package against Russia — targets shadow fleet insurance and STS transfers', time:'22h ago', impact:'Increases cost of Russian crude procurement. Benefits compliant refiners; tightens Urals supply to non-sanctioned buyers.' },
+    { level:'medium', cat:'DOMESTIC', headline:'BPCL, HPCL signal MS/HSD price adjustment within 48 hours amid rising OMC under-recoveries', time:'1d ago', impact:'May improve retail margins if passed through. Watch for demand elasticity response in Indian market.' },
+  ];
+
+  document.getElementById('newsFeed').innerHTML = newsItems.map(n =>
+    `<div class="news-item"><div class="news-tag ${n.level}">${n.level}</div><div><div class="news-headline">${n.headline}</div><div class="news-meta">${n.cat} · ${n.time}</div></div></div>`
+  ).join('');
+
+  document.getElementById('eventTracker').innerHTML = newsItems.map(n =>
+    `<div class="arch-source"><div class="arch-name" style="font-size:11px">${n.headline.substring(0,80)}...</div><div class="arch-detail" style="font-size:10px"><strong>Market Impact:</strong> ${n.impact}</div></div>`
+  ).join('');
+
+  // Filters
+  const categories = [...new Set(newsItems.map(n => n.cat))];
+  document.getElementById('newsFilters').innerHTML = categories.map(c =>
+    `<button class="desk-btn" style="font-size:10px;padding:4px 10px;background:var(--bg-secondary);color:var(--text-secondary);border:1px solid var(--border)" onclick="this.style.borderColor=this.style.borderColor==='rgb(6, 182, 212)'?'var(--border)':'rgb(6, 182, 212)';this.style.color=this.style.color==='rgb(6, 182, 212)'?'var(--text-secondary)':'rgb(6, 182, 212)'">${c}</button>`
+  ).join('');
+}
+
+// ── 7i: ARCHITECTURE & DATA ──
+function renderArchitecture() {
+  const sources = [
+    { name:'Exchange Rate API', url:'open.er-api.com', type:'live', refresh:'Every 60s', covers:'USD/INR, EUR/USD, GBP/USD, CNY/USD, JPY/USD', note:'Free tier, CORS-enabled. Live API call on page load and every 60 seconds.' },
+    { name:'Crude Oil Benchmarks', url:'—', type:'simulated', refresh:'Every 5s (sim tick)', covers:'Brent, WTI, Dubai, Oman, Murban, Basrah Light, Arab Light, Upper Zakum, ESPO', note:'Reference prices seeded from recent Platts/Argus actuals. Simulated tick updates for UX. Production: connect to Platts eWindow, Argus, or ICE API.' },
+    { name:'Product Prices', url:'—', type:'simulated', refresh:'Every 5s (sim tick)', covers:'Gasoline, Diesel, Jet, Fuel Oil across MOPS/NWE/USGC', note:'Reference prices from recent MOPS/Platts assessments. Production: Platts MOC, Argus, or OPIS feeds.' },
+    { name:'Petrochemical Feedstock', url:'—', type:'simulated', refresh:'Every 5s (sim tick)', covers:'Naphtha, Ethylene, Propylene, BTX, Paraxylene', note:'Reference from ICIS/Platts petchem assessments. Production: ICIS, Platts, or Argus petchem data feeds.' },
+    { name:'Freight / Tanker Rates', url:'—', type:'simulated', refresh:'Every 5s (sim tick)', covers:'VLCC, Suezmax, Aframax, MR rates on key routes', note:'Reference from Baltic Exchange and Clarksons. Production: Baltic Exchange API, Clarksons SIN.' },
+    { name:'OPEC+ Data', url:'—', type:'simulated', refresh:'Manual (static)', covers:'Production quotas, compliance, meeting schedule', note:'Reference data from OPEC Monthly Oil Market Report. Production: OPEC API, Kpler, Vortexa.' },
+    { name:'Macro Indicators', url:'—', type:'simulated', refresh:'Manual (static)', covers:'GDP, PMI, CPI, policy rates', note:'Reference from RBI, ISM, NBS. Production: Bloomberg, Reuters Eikon, CEIC.' },
+    { name:'News Headlines', url:'—', type:'simulated', refresh:'Manual (curated)', covers:'Market-moving events across OPEC, geopolitical, refinery, policy, weather', note:'Curated reference headlines. Production: Reuters News API, Bloomberg Terminal, Platts News, Argus Media.' },
+    { name:'Port / Canal Status', url:'—', type:'simulated', refresh:'Manual (static)', covers:'Suez, Hormuz, Malacca, Indian ports', note:'Reference indicators. Production: MarineTraffic API, Kpler port data, vessel AIS tracking.' },
+  ];
+  document.getElementById('archSources').innerHTML = sources.map(s =>
+    `<div class="arch-source"><div style="display:flex;justify-content:space-between;align-items:center"><div class="arch-name">${s.name}</div><span class="arch-status ${s.type}">${s.type.toUpperCase()}</span></div><div class="arch-detail"><strong>Covers:</strong> ${s.covers}<br><strong>Refresh:</strong> ${s.refresh}<br><strong>Note:</strong> ${s.note}</div></div>`
+  ).join('');
+
+  // Refresh log
+  document.getElementById('refreshLog').innerHTML = refreshLog.slice(-15).reverse().map(r =>
+    `<div style="padding:6px 14px;border-bottom:1px solid var(--border);font-family:var(--mono);font-size:10px;color:var(--text-secondary)"><span style="color:var(--text-muted)">${r.time}</span> — ${r.source}: <span class="arch-status ${r.status}" style="font-size:9px">${r.status.toUpperCase()}</span> ${r.detail}</div>`
+  ).join('') || '<div style="padding:14px;color:var(--text-muted);font-size:11px">Log populates as data refreshes...</div>';
+
+  // Assumptions
+  document.getElementById('assumptions').innerHTML = `
+    <div style="font-size:12px;line-height:1.7;color:var(--text-secondary)">
+      <div class="assumption-item"><strong>GRM Calculation:</strong> Singapore complex GRM proxy uses a simplified product yield split of 35% gasoline, 40% diesel, 10% ATF, 8% HSFO, 7% VLSFO against Dubai crude. Actual GRM varies by crude slate, refinery configuration, and operating mode.</div>
+      <div class="assumption-item"><strong>Crack Spreads:</strong> All product crack spreads are calculated vs Dubai crude (MOPS assessment basis). NWE cracks are vs Brent. USGC cracks are vs WTI.</div>
+      <div class="assumption-item"><strong>Naphtha Cracker Economics:</strong> Assumed liquid cracker yields: 30% ethylene, 16% propylene, 7% benzene. Actual yields depend on cracker severity, feedstock quality, and co-product recovery.</div>
+      <div class="assumption-item"><strong>Freight Costs:</strong> Flat rates are reference estimates based on recent Worldscale publications. $/bbl conversions assume 7.33 bbl/MT for crude. Actual costs depend on vessel specifications, port costs, canal fees, and insurance.</div>
+      <div class="assumption-item"><strong>FX Impact:</strong> GRM sensitivity to FX uses linear approximation: ₹1/$ move ≈ ₹90/MT GRM impact at ~$12/bbl GRM level. Actual impact is path-dependent and influenced by hedging positions.</div>
+      <div class="assumption-item"><strong>Data Freshness:</strong> Reference prices are seeded from recent market actuals but are NOT live market prices. Simulated ticks add small random variations to demonstrate real-time UX. All simulated data is clearly labeled.</div>
+      <div class="assumption-item"><strong>Arbitrage Windows:</strong> Simplified buy-sell-freight comparison. Does not include storage, financing, quality adjustments, demurrage, or credit terms.</div>
+      <div class="assumption-item"><strong>Conversion Factors:</strong> Crude: 7.33 bbl/MT. Naphtha: 8.33 bbl/MT. Gasoline: 8.33 bbl/MT. Diesel/Gasoil: 7.46 bbl/MT.</div>
+      <div class="assumption-item"><strong>Indian Context:</strong> OMC pricing references are indicative of BPCL/HPCL/IOCL positioning. Private refiner (RIL, Nayara) economics may differ based on export orientation and product mix.</div>
+    </div>`;
+
+  // Architecture diagram
+  document.getElementById('archDiagram').innerHTML = `
+    <div style="font-family:var(--mono);font-size:10px;line-height:1.6;color:var(--text-secondary);white-space:pre;overflow-x:auto">
+┌─────────────────────────────────────────────────────────────────┐
+│                    REFINERYDESK ARCHITECTURE                     │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                   │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────┐   │
+│  │  FREE APIs   │  │  PREMIUM     │  │  INTERNAL FEEDS      │   │
+│  │              │  │  (Planned)   │  │  (Planned)           │   │
+│  │ • ExchRate   │  │ • Platts     │  │ • SAP IS-Oil         │   │
+│  │ • EIA Open   │  │ • Argus      │  │ • CTRM System        │   │
+│  │ • OWID       │  │ • ICIS       │  │ • Scheduling         │   │
+│  │ • RSS News   │  │ • Baltic Exch│  │ • Inventory Mgmt     │   │
+│  └──────┬───────┘  └──────┬───────┘  └──────────┬───────────┘   │
+│         │                 │                      │               │
+│         ▼                 ▼                      ▼               │
+│  ┌─────────────────────────────────────────────────────────┐     │
+│  │              DATA NORMALIZATION LAYER                    │     │
+│  │  • Unit conversion (bbl↔MT, $/bbl↔$/MT)                │     │
+│  │  • Currency conversion (USD→INR at live FX)             │     │
+│  │  • Timestamp normalization (UTC, IST, SGT)              │     │
+│  │  • Quality validation & outlier detection               │     │
+│  └────────────────────────┬────────────────────────────────┘     │
+│                           ▼                                       │
+│  ┌─────────────────────────────────────────────────────────┐     │
+│  │              CALCULATION ENGINE                          │     │
+│  │  • Crack spread computation                             │     │
+│  │  • GRM proxy calculation                                │     │
+│  │  • Arbitrage window detection                           │     │
+│  │  • Freight scenario modeling                            │     │
+│  │  • FX sensitivity analysis                              │     │
+│  └────────────────────────┬────────────────────────────────┘     │
+│                           ▼                                       │
+│  ┌─────────────────────────────────────────────────────────┐     │
+│  │              PRESENTATION LAYER (This Dashboard)         │     │
+│  │  9 Tabs · Auto-refresh · Interactive · Alert System     │     │
+│  └─────────────────────────────────────────────────────────┘     │
+│                                                                   │
+│  Status: V1.0 — Reference data + simulation + live FX            │
+│  Target: V2.0 — Full API integration + backend proxy             │
+└─────────────────────────────────────────────────────────────────┘
+    </div>`;
+}
+
+// ──────────────────────────────────────────────
+// SECTION 8: LIVE FX FETCH
+// ──────────────────────────────────────────────
+async function fetchFxRates() {
+  try {
+    const resp = await fetch('https://open.er-api.com/v6/latest/USD');
+    if (!resp.ok) throw new Error('FX API HTTP ' + resp.status);
+    const data = await resp.json();
+    if (data.rates) {
+      const pairs = { 'fx.usdInr':'INR', 'fx.eurUsd':null, 'fx.gbpUsd':null, 'fx.cnyUsd':'CNY', 'fx.jpyUsd':'JPY' };
+      if (data.rates.INR && STATE['fx.usdInr']) { STATE['fx.usdInr'].current = +data.rates.INR.toFixed(2); STATE['fx.usdInr'].base = STATE['fx.usdInr'].current; }
+      if (data.rates.EUR && STATE['fx.eurUsd']) { STATE['fx.eurUsd'].current = +(1/data.rates.EUR).toFixed(4); STATE['fx.eurUsd'].base = STATE['fx.eurUsd'].current; }
+      if (data.rates.GBP && STATE['fx.gbpUsd']) { STATE['fx.gbpUsd'].current = +(1/data.rates.GBP).toFixed(4); STATE['fx.gbpUsd'].base = STATE['fx.gbpUsd'].current; }
+      if (data.rates.CNY && STATE['fx.cnyUsd']) { STATE['fx.cnyUsd'].current = +data.rates.CNY.toFixed(4); STATE['fx.cnyUsd'].base = STATE['fx.cnyUsd'].current; }
+      if (data.rates.JPY && STATE['fx.jpyUsd']) { STATE['fx.jpyUsd'].current = +data.rates.JPY.toFixed(2); STATE['fx.jpyUsd'].base = STATE['fx.jpyUsd'].current; }
+      fxLive = true;
+      addRefreshLog('FX API (open.er-api.com)', 'live', 'Rates updated: INR=' + data.rates.INR);
+    }
+  } catch(e) {
+    console.warn('FX fetch failed:', e);
+    addRefreshLog('FX API', 'simulated', 'Fetch failed — using reference rates. ' + e.message);
+  }
+}
+
+function addRefreshLog(source, status, detail) {
+  const now = new Date();
+  const time = now.toLocaleTimeString('en-GB', {hour:'2-digit',minute:'2-digit',second:'2-digit',timeZone:'Asia/Kolkata'});
+  refreshLog.push({ time, source, status, detail });
+  if (refreshLog.length > 50) refreshLog.shift();
+}
+
+// ──────────────────────────────────────────────
+// SECTION 9: MASTER RENDER & REFRESH LOOP
+// ──────────────────────────────────────────────
+function renderAll() {
+  renderCommand();
+  renderCrude();
+  renderProducts();
+  renderPetchem();
+  renderCracks();
+  renderFx();
+  renderLogistics();
+  renderNews();
+  renderArchitecture();
+  document.getElementById('lastRefresh').textContent = 'Last data refresh: ' + new Date().toLocaleTimeString('en-GB', {hour:'2-digit',minute:'2-digit',second:'2-digit',timeZone:'Asia/Kolkata'}) + ' IST';
+}
+
+function mainLoop() {
+  tick();
+  renderAll();
+  addRefreshLog('Simulation Engine', 'simulated', 'Tick applied to all reference data');
+}
+
+// ──────────────────────────────────────────────
+// SECTION 10: INITIALIZATION
+// ──────────────────────────────────────────────
+initState();
+renderAll();
+rotateAlert();
+updateClocks();
+updateMarketStatus();
+
+// Fetch live FX immediately
+fetchFxRates();
+
+// Intervals
+setInterval(mainLoop, 5000);        // Data tick every 5s
+setInterval(updateClocks, 1000);    // Clock every 1s
+setInterval(updateMarketStatus, 30000); // Market status every 30s
+setInterval(rotateAlert, 12000);    // Alert rotation every 12s
+setInterval(fetchFxRates, 60000);   // FX API every 60s
+
+// Initial log entries
+addRefreshLog('System', 'live', 'Dashboard initialized');
+addRefreshLog('Reference Data', 'simulated', 'All crude, product, petchem, freight prices loaded from reference set');
+</script>
+</body>
+</html>
