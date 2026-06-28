@@ -255,6 +255,8 @@ body.compact .arch-detail{font-size:10px}
   <div class="grid grid-4" id="crackCards"></div>
   <div class="section-title" style="margin-top:16px">Arbitrage Windows</div>
   <div class="grid grid-3" id="arbCards"></div>
+  <div class="section-title" style="margin-top:16px">Price Correlations (rolling 24 ticks)</div>
+  <div class="card" id="correlMatrix"></div>
 </div>
 
 <!-- ═══════════════════════════════════════════════════════ -->
@@ -275,6 +277,10 @@ body.compact .arch-detail{font-size:10px}
       <div class="section-title" style="margin-top:12px">Procurement Signals</div>
       <div class="card" id="procureCard"></div>
     </div>
+  </div>
+  <div class="section-title" style="margin-top:16px">Price History — Brent · Dubai · WTI (rolling 24 ticks)</div>
+  <div class="card" style="padding:14px 16px">
+    <div style="position:relative;height:250px"><canvas id="crudePriceChart"></canvas></div>
   </div>
 </div>
 
@@ -325,11 +331,67 @@ body.compact .arch-detail{font-size:10px}
       <div class="card"><table class="data-table" id="tblCracks"></table></div>
       <div class="section-title">Complex GRM Proxy</div>
       <div class="card" id="grmCard"></div>
+      <div class="section-title" style="margin-top:12px">GRM Trend (last 100 ticks)</div>
+      <div class="card" style="padding:14px 16px">
+        <div style="position:relative;height:200px"><canvas id="grmTrendChart"></canvas></div>
+      </div>
     </div>
     <div>
       <div class="section-title">What-If: Crude Cost Sensitivity</div>
       <div class="card" id="whatIfCard"></div>
-      <div class="section-title">Regional Margin Comparison</div>
+      <div class="section-title" style="margin-top:12px">Scenario Builder</div>
+      <div class="card" id="scenarioBuilderCard" style="padding:12px;overflow-x:auto">
+        <table style="width:100%;min-width:460px;border-collapse:collapse;font-size:11px">
+          <thead>
+            <tr>
+              <th style="text-align:left;padding:6px 8px;color:var(--text-muted);font-size:9px;text-transform:uppercase;letter-spacing:.8px;border-bottom:1px solid var(--border)">Parameter</th>
+              <th style="padding:6px 8px;color:var(--cyan);text-align:center;font-size:9px;text-transform:uppercase;letter-spacing:.8px;border-bottom:1px solid var(--border)">A — Current</th>
+              <th style="padding:6px 8px;color:var(--text-secondary);text-align:center;font-size:9px;text-transform:uppercase;letter-spacing:.8px;border-bottom:1px solid var(--border)">B — Scenario</th>
+              <th style="padding:6px 8px;color:var(--text-secondary);text-align:center;font-size:9px;text-transform:uppercase;letter-spacing:.8px;border-bottom:1px solid var(--border)">C — Scenario</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="border-bottom:1px solid var(--border)">
+              <td style="padding:8px;color:var(--text-secondary)">Crude Cost ($/bbl)</td>
+              <td style="padding:8px;text-align:center;font-family:var(--mono)" id="scen_a_crude">—</td>
+              <td style="padding:6px;text-align:center"><input class="desk-input" id="scen_b_crude" type="number" step="0.5" style="width:76px" oninput="updateScenario()"></td>
+              <td style="padding:6px;text-align:center"><input class="desk-input" id="scen_c_crude" type="number" step="0.5" style="width:76px" oninput="updateScenario()"></td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--border)">
+              <td style="padding:8px;color:var(--text-secondary)">Product Adj (%)</td>
+              <td style="padding:8px;text-align:center;font-family:var(--mono);color:var(--text-muted)">0%</td>
+              <td style="padding:6px">
+                <div style="font-family:var(--mono);font-size:10px;text-align:center;color:var(--text-secondary);margin-bottom:2px"><span id="scen_b_adj_val">0%</span></div>
+                <input type="range" id="scen_b_adj" min="-10" max="10" step="0.5" value="0" oninput="document.getElementById('scen_b_adj_val').textContent=this.value+'%';updateScenario()">
+              </td>
+              <td style="padding:6px">
+                <div style="font-family:var(--mono);font-size:10px;text-align:center;color:var(--text-secondary);margin-bottom:2px"><span id="scen_c_adj_val">0%</span></div>
+                <input type="range" id="scen_c_adj" min="-10" max="10" step="0.5" value="0" oninput="document.getElementById('scen_c_adj_val').textContent=this.value+'%';updateScenario()">
+              </td>
+            </tr>
+            <tr style="border-bottom:2px solid var(--border-light)">
+              <td style="padding:8px;color:var(--text-secondary)">Freight ($/bbl)</td>
+              <td style="padding:8px;text-align:center;font-family:var(--mono);color:var(--text-muted)">0.00</td>
+              <td style="padding:6px;text-align:center"><input class="desk-input" id="scen_b_freight" type="number" step="0.1" value="0" style="width:76px" oninput="updateScenario()"></td>
+              <td style="padding:6px;text-align:center"><input class="desk-input" id="scen_c_freight" type="number" step="0.1" value="0" style="width:76px" oninput="updateScenario()"></td>
+            </tr>
+            <tr style="background:var(--bg-secondary);border-bottom:1px solid var(--border)">
+              <td style="padding:10px 8px;font-weight:600;color:var(--text-primary);font-size:11px">GRM ($/bbl)</td>
+              <td style="padding:10px 8px;text-align:center;font-family:var(--mono);font-weight:700;font-size:20px" id="scen_a_grm">—</td>
+              <td style="padding:10px 8px;text-align:center;font-family:var(--mono);font-weight:700;font-size:20px" id="scen_b_grm">—</td>
+              <td style="padding:10px 8px;text-align:center;font-family:var(--mono);font-weight:700;font-size:20px" id="scen_c_grm">—</td>
+            </tr>
+            <tr>
+              <td style="padding:6px 8px;color:var(--text-muted);font-size:10px">vs Base (A)</td>
+              <td style="padding:6px 8px;text-align:center;font-family:var(--mono);font-size:10px;color:var(--text-muted)">Base</td>
+              <td style="padding:6px 8px;text-align:center;font-family:var(--mono);font-size:11px" id="scen_b_vs">—</td>
+              <td style="padding:6px 8px;text-align:center;font-family:var(--mono);font-size:11px" id="scen_c_vs">—</td>
+            </tr>
+          </tbody>
+        </table>
+        <div style="margin-top:8px;font-size:9px;color:var(--text-muted)">Yield: 35% MS · 40% HSD · 10% ATF · 8% HSFO · 7% VLSFO · freight subtracted from GRM</div>
+      </div>
+      <div class="section-title" style="margin-top:12px">Regional Margin Comparison</div>
       <div class="card"><table class="data-table" id="tblRegionalMargins"></table></div>
     </div>
   </div>
@@ -423,6 +485,9 @@ body.compact .arch-detail{font-size:10px}
   <span id="lastRefresh">Last data refresh: --</span>
 </div>
 
+<!-- Chart.js — loaded before inline script so charts are available on first renderAll() -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+
 <!-- ═══════════════════════════════════════════════════════════ -->
 <!-- JAVASCRIPT ENGINE                                          -->
 <!-- ═══════════════════════════════════════════════════════════ -->
@@ -500,6 +565,10 @@ let fxLive = null;
 let eiaLive = false;
 let liveNews = null;
 let mcxData = null;
+let grmHistory = [];
+let crudePriceChart = null;
+let grmTrendChart = null;
+let scenarioInitted = false;
 
 // EIA API key — get a free key at https://www.eia.gov/opendata/
 // Leave empty to use reference data only (no EIA calls will be made)
@@ -696,6 +765,44 @@ function renderCommand() {
     const margin = a.sell - a.buy - a.freight;
     return `<div class="card"><div class="card-header"><div class="card-title">${a.label}</div><div class="card-badge">${margin>0?'OPEN':'CLOSED'}</div></div><div class="price-med ${cls(margin)}">${fmtSgn(margin)} $/bbl</div><div style="font-size:10px;color:var(--text-muted);margin-top:6px">Buy: $${fmt(a.buy)} · Sell: $${fmt(a.sell)} · Freight: $${fmt(a.freight)}</div></div>`;
   }).join('');
+
+  // ── 3C: Price correlation matrix ──
+  const corrSeries = [
+    { label:'Brent',    key:'crude.brent' },
+    { label:'Dubai',    key:'crude.dubai' },
+    { label:'WTI',      key:'crude.wti' },
+    { label:'Gas MOPS', key:'products.gasolineMOPS' },
+    { label:'Dsl MOPS', key:'products.dieselMOPS' },
+  ];
+  const hists = corrSeries.map(s => get(s.key).history);
+  const lbls  = corrSeries.map(s => s.label);
+  function corrBg(r, diag) {
+    if (diag) return 'background:var(--bg-secondary)';
+    if (r > 0.80) return 'background:rgba(34,197,94,.10)';
+    if (r > 0.50) return 'background:rgba(245,158,11,.10)';
+    return 'background:rgba(239,68,68,.10)';
+  }
+  function corrFg(r, diag) {
+    if (diag) return 'color:var(--text-muted)';
+    if (r > 0.80) return 'color:var(--green)';
+    if (r > 0.50) return 'color:var(--amber)';
+    return 'color:var(--red)';
+  }
+  let mx = `<table style="width:100%;border-collapse:collapse;font-family:var(--mono);font-size:11px">`;
+  mx += `<tr><td style="padding:7px 10px;font-size:9px;color:var(--text-muted)"></td>`;
+  lbls.forEach(l => { mx += `<th style="padding:7px 10px;font-size:9px;color:var(--text-secondary);text-align:center;font-weight:600">${l}</th>`; });
+  mx += '</tr>';
+  hists.forEach((rowH, i) => {
+    mx += `<tr><th style="padding:7px 10px;font-size:9px;color:var(--text-secondary);text-align:left;font-weight:600;white-space:nowrap">${lbls[i]}</th>`;
+    hists.forEach((colH, j) => {
+      const diag = i === j;
+      const r = diag ? 1 : pearsonCorr(rowH, colH);
+      mx += `<td style="padding:7px 10px;text-align:center;${corrBg(r,diag)};${corrFg(r,diag)};border:1px solid var(--border)">${diag ? '–' : r.toFixed(2)}</td>`;
+    });
+    mx += '</tr>';
+  });
+  mx += '</table><div style="padding:8px 10px;font-size:9px;color:var(--text-muted)">Green &gt;0.80 · Amber 0.50–0.80 · Red &lt;0.50 · history window: 24 ticks</div>';
+  document.getElementById('correlMatrix').innerHTML = mx;
 }
 
 // ── 7b: CRUDE OIL MARKETS ──
@@ -757,6 +864,34 @@ function renderCrude() {
       <div style="margin-bottom:8px"><strong style="color:var(--text-primary)">Spot Market:</strong> Al-Shaheen, Murban cargoes offered; Upper Zakum tight</div>
       <div><strong style="color:var(--text-primary)">Recommendation:</strong> ${brentDubaiSpread > 1.5 ? 'Consider increasing AG sour crude intake vs dated Brent-linked WAF grades' : 'WAF and AG grades at comparable delivered cost'}</div>
     </div>`;
+
+  // ── 3A: Crude price history chart ──
+  const brentH = get('crude.brent').history;
+  const dubaiH = get('crude.dubai').history;
+  const wtiH   = get('crude.wti').history;
+  const tickLabels = brentH.map((_, i) => i === brentH.length - 1 ? 'Now' : String(i - brentH.length + 1));
+  if (crudePriceChart) {
+    crudePriceChart.data.labels = tickLabels;
+    crudePriceChart.data.datasets[0].data = [...brentH];
+    crudePriceChart.data.datasets[1].data = [...dubaiH];
+    crudePriceChart.data.datasets[2].data = [...wtiH];
+    crudePriceChart.update('none');
+  } else if (document.getElementById('crudePriceChart') && typeof Chart !== 'undefined') {
+    crudePriceChart = new Chart(document.getElementById('crudePriceChart').getContext('2d'), {
+      type: 'line',
+      data: {
+        labels: tickLabels,
+        datasets: [
+          { label:'Brent', data:[...brentH], borderColor:'#3b82f6', backgroundColor:'transparent', borderWidth:1.5, pointRadius:0, tension:0.3 },
+          { label:'Dubai', data:[...dubaiH], borderColor:'#f59e0b', backgroundColor:'transparent', borderWidth:1.5, pointRadius:0, tension:0.3 },
+          { label:'WTI',   data:[...wtiH],   borderColor:'#22c55e', backgroundColor:'transparent', borderWidth:1.5, pointRadius:0, tension:0.3 },
+        ],
+      },
+      options: { ...CHART_OPTS, plugins: { ...CHART_OPTS.plugins }, scales: { ...CHART_OPTS.scales,
+        y: { ...CHART_OPTS.scales.y, ticks: { ...CHART_OPTS.scales.y.ticks, callback: v => '$'+v.toFixed(1) } },
+      }},
+    });
+  }
 }
 
 // ── 7c: FUEL PRODUCTS ──
@@ -889,9 +1024,38 @@ function renderCracks() {
     ['NWE Complex', (get('products.gasolineNWE').current*0.30+get('products.dieselNWE').current*0.45+get('products.jetNWE').current*0.10+get('products.hsfoNWE').current*0.15) - get('crude.brent').current, 'vs Brent'],
     ['USGC Coking', (get('products.gasolineUSGC').current*0.40+get('products.dieselUSGC').current*0.35+get('products.jetUSGC').current*0.15+get('products.hsfo380').current*0.10) - get('crude.wti').current, 'vs WTI'],
   ];
-  document.getElementById('tblRegionalMargins').innerHTML = `<thead><tr><th>Region</th><th>GRM Proxy</th><th>Basis</th></tr></thead><tbody>${regionalData.map(([name,val,basis]) => 
+  document.getElementById('tblRegionalMargins').innerHTML = `<thead><tr><th>Region</th><th>GRM Proxy</th><th>Basis</th></tr></thead><tbody>${regionalData.map(([name,val,basis]) =>
     `<tr><td class="label-cell">${name}</td><td class="${cls(val)}" style="font-weight:600">$${fmt(val)}</td><td class="sub">${basis}</td></tr>`
   ).join('')}</tbody>`;
+
+  // ── 3B: GRM trend chart ──
+  if (grmHistory.length > 0) {
+    const grmLabels = grmHistory.map((_, i) => i === grmHistory.length - 1 ? 'Now' : '');
+    const breakeven = Array(grmHistory.length).fill(0);
+    if (grmTrendChart) {
+      grmTrendChart.data.labels = grmLabels;
+      grmTrendChart.data.datasets[0].data = [...grmHistory];
+      grmTrendChart.data.datasets[1].data = breakeven;
+      grmTrendChart.update('none');
+    } else if (document.getElementById('grmTrendChart') && typeof Chart !== 'undefined') {
+      grmTrendChart = new Chart(document.getElementById('grmTrendChart').getContext('2d'), {
+        type: 'line',
+        data: {
+          labels: grmLabels,
+          datasets: [
+            { label:'GRM $/bbl', data:[...grmHistory], borderColor:'#06b6d4', backgroundColor:'rgba(6,182,212,0.10)', fill:true, borderWidth:1.5, pointRadius:0, tension:0.4 },
+            { label:'Breakeven', data: breakeven, borderColor:'rgba(239,68,68,0.45)', backgroundColor:'transparent', borderDash:[5,4], borderWidth:1, pointRadius:0, fill:false },
+          ],
+        },
+        options: { ...CHART_OPTS, scales: { ...CHART_OPTS.scales,
+          y: { ...CHART_OPTS.scales.y, ticks: { ...CHART_OPTS.scales.y.ticks, callback: v => '$'+v.toFixed(1) } },
+        }},
+      });
+    }
+  }
+
+  // ── 3D: Scenario builder ──
+  updateScenario();
 }
 
 function updateWhatIf() {
@@ -1307,6 +1471,66 @@ async function fetchMcx() {
   }
 }
 
+// ── 3C: PEARSON CORRELATION ──
+function pearsonCorr(a, b) {
+  const n = Math.min(a.length, b.length);
+  if (n < 2) return 1;
+  let sA=0,sB=0,sAB=0,sA2=0,sB2=0;
+  for (let i=0;i<n;i++){sA+=a[i];sB+=b[i];sAB+=a[i]*b[i];sA2+=a[i]*a[i];sB2+=b[i]*b[i];}
+  const num=n*sAB-sA*sB, den=Math.sqrt((n*sA2-sA*sA)*(n*sB2-sB*sB));
+  return den===0 ? 1 : Math.max(-1, Math.min(1, num/den));
+}
+
+// ── 3D: SCENARIO BUILDER ──
+function updateScenario() {
+  if (!document.getElementById('scen_a_grm')) return;
+  const gas=get('products.gasolineMOPS').current, dsl=get('products.dieselMOPS').current;
+  const jet=get('products.jetMOPS').current, hsfo=get('products.hsfo380').current, vlsfo=get('products.vlsfo').current;
+  const baseProducts = gas*0.35 + dsl*0.40 + jet*0.10 + hsfo*0.08 + vlsfo*0.07;
+  const dubai = get('crude.dubai').current;
+  // Pre-fill B and C crude inputs once on first call
+  if (!scenarioInitted) {
+    document.getElementById('scen_b_crude').value = dubai.toFixed(2);
+    document.getElementById('scen_c_crude').value = dubai.toFixed(2);
+    scenarioInitted = true;
+  }
+  // Scenario A (live current)
+  const grmA = +(baseProducts - dubai).toFixed(2);
+  document.getElementById('scen_a_crude').textContent = '$' + fmt(dubai);
+  document.getElementById('scen_a_grm').textContent = fmt(grmA);
+  document.getElementById('scen_a_grm').className = cls(grmA);
+  // Scenario B
+  const crudeB = parseFloat(document.getElementById('scen_b_crude').value) || dubai;
+  const adjB   = parseFloat(document.getElementById('scen_b_adj').value)   || 0;
+  const freightB = parseFloat(document.getElementById('scen_b_freight').value) || 0;
+  const grmB = +(baseProducts*(1+adjB/100) - crudeB - freightB).toFixed(2);
+  document.getElementById('scen_b_grm').textContent = fmt(grmB);
+  document.getElementById('scen_b_grm').className = cls(grmB);
+  const vsB = +(grmB - grmA).toFixed(2);
+  document.getElementById('scen_b_vs').textContent = fmtSgn(vsB);
+  document.getElementById('scen_b_vs').className = cls(vsB);
+  // Scenario C
+  const crudeC = parseFloat(document.getElementById('scen_c_crude').value) || dubai;
+  const adjC   = parseFloat(document.getElementById('scen_c_adj').value)   || 0;
+  const freightC = parseFloat(document.getElementById('scen_c_freight').value) || 0;
+  const grmC = +(baseProducts*(1+adjC/100) - crudeC - freightC).toFixed(2);
+  document.getElementById('scen_c_grm').textContent = fmt(grmC);
+  document.getElementById('scen_c_grm').className = cls(grmC);
+  const vsC = +(grmC - grmA).toFixed(2);
+  document.getElementById('scen_c_vs').textContent = fmtSgn(vsC);
+  document.getElementById('scen_c_vs').className = cls(vsC);
+}
+
+// Shared dark-theme Chart.js defaults
+const CHART_OPTS = {
+  responsive: true, maintainAspectRatio: false, animation: false,
+  plugins: { legend: { labels: { color:'#8899aa', font:{ family:"'JetBrains Mono',monospace", size:10 }, boxWidth:12, padding:12 } } },
+  scales: {
+    x: { grid:{ color:'#1e2a38' }, ticks:{ color:'#8899aa', font:{ size:9 } }, border:{ color:'#1e2a38' } },
+    y: { grid:{ color:'#1e2a38' }, ticks:{ color:'#8899aa', font:{ size:9 } }, border:{ color:'#1e2a38' } },
+  },
+};
+
 function addRefreshLog(source, status, detail) {
   const now = new Date();
   const time = now.toLocaleTimeString('en-GB', {hour:'2-digit',minute:'2-digit',second:'2-digit',timeZone:'Asia/Kolkata'});
@@ -1334,6 +1558,13 @@ function renderAll() {
 
 function mainLoop() {
   tick();
+  // Track GRM history for trend chart (3B)
+  const _d = get('crude.dubai').current;
+  const _grm = get('products.gasolineMOPS').current*0.35 + get('products.dieselMOPS').current*0.40 +
+               get('products.jetMOPS').current*0.10 + get('products.hsfo380').current*0.08 +
+               get('products.vlsfo').current*0.07 - _d;
+  grmHistory.push(+_grm.toFixed(2));
+  if (grmHistory.length > 100) grmHistory.shift();
   renderAll();
   addRefreshLog('Simulation Engine', 'simulated', 'Tick applied to all reference data');
 }
