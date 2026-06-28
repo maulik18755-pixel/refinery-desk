@@ -64,7 +64,7 @@ export const REF = {
 
 // EIA API key — free at https://www.eia.gov/opendata/  (takes ~1 min to register)
 // Enables live Brent & WTI daily spot prices
-export const EIA_API_KEY = '';
+export const EIA_API_KEY = '8LNlhkIfu8vNodT6Gbm6626BJCBSeZlakc6KwmHD';
 
 // FRED API key — free at https://fred.stlouisfed.org/docs/api/api_key.html  (~1 min)
 // Enables live US Fed Funds rate, 10Y Treasury yield, DXY dollar index
